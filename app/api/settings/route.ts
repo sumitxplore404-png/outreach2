@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-import { supabase, type Settings } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
   try {
@@ -16,26 +16,32 @@ export async function GET() {
       .eq('id', 'singleton')
       .single()
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+    if (error) {
       console.error('Settings fetch error:', error)
+      
+      // If no settings found, return empty defaults
+      if (error.code === 'PGRST116') {
+        return NextResponse.json({
+          openaiApiKey: "",
+          email: "",
+          appPassword: "",
+          ccRecipients: "",
+          hasOpenaiKey: false,
+          hasAppPassword: false,
+        })
+      }
+      
       return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 })
     }
 
     // Return settings with masked password for security
-    const safeSettings = settings ? {
-      openaiApiKey: settings.openai_api_key ? "***" + settings.openai_api_key.slice(-4) : "",
-      email: settings.email || "",
-      appPassword: settings.app_password ? "***" + settings.app_password.slice(-4) : "",
-      ccRecipients: settings.cc_recipients || "",
-      hasOpenaiKey: !!settings.openai_api_key,
-      hasAppPassword: !!settings.app_password,
-    } : {
-      openaiApiKey: "",
-      email: "",
-      appPassword: "",
-      ccRecipients: "",
-      hasOpenaiKey: false,
-      hasAppPassword: false,
+    const safeSettings = {
+      openaiApiKey: settings?.openai_api_key ? "***" + settings.openai_api_key.slice(-4) : "",
+      email: settings?.email || "",
+      appPassword: settings?.app_password ? "***" + settings.app_password.slice(-4) : "",
+      ccRecipients: settings?.cc_recipients || "",
+      hasOpenaiKey: !!settings?.openai_api_key,
+      hasAppPassword: !!settings?.app_password,
     }
 
     return NextResponse.json(safeSettings)
@@ -57,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!openaiApiKey || !email || !appPassword) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 })
+      return NextResponse.json({ error: "OpenAI API key, email, and app password are required" }, { status: 400 })
     }
 
     // Validate email format
@@ -71,28 +77,60 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid OpenAI API key format" }, { status: 400 })
     }
 
-    // Update or insert settings in Supabase (singleton pattern)
-    const { error } = await supabase
-      .from('settings')
-      .upsert({
-        id: 'singleton', // Use a fixed ID for singleton pattern
-        openai_api_key: openaiApiKey,
-        email,
-        app_password: appPassword,
-        cc_recipients: ccRecipients,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'id'
-      })
+    console.log('Attempting to save settings to Supabase...')
 
-    if (error) {
-      console.error('Settings save error:', error)
-      return NextResponse.json({ error: "Failed to save settings" }, { status: 500 })
+    // First try to get existing settings
+    const { data: existing } = await supabase
+      .from('settings')
+      .select('id')
+      .eq('id', 'singleton')
+      .single()
+
+    let result
+
+    if (existing) {
+      // Update existing settings
+      result = await supabase
+        .from('settings')
+        .update({
+          openai_api_key: openaiApiKey,
+          email,
+          app_password: appPassword,
+          cc_recipients: ccRecipients || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 'singleton')
+    } else {
+      // Insert new settings
+      result = await supabase
+        .from('settings')
+        .insert({
+          id: 'singleton',
+          openai_api_key: openaiApiKey,
+          email,
+          app_password: appPassword,
+          cc_recipients: ccRecipients || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
     }
 
+    if (result.error) {
+      console.error('Supabase settings save error:', result.error)
+      return NextResponse.json({ 
+        error: `Database error: ${result.error.message}`,
+        details: result.error
+      }, { status: 500 })
+    }
+
+    console.log('Settings saved successfully to Supabase')
     return NextResponse.json({ success: true, message: "Settings saved successfully" })
+
   } catch (error) {
     console.error('Settings POST error:', error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Internal server error",
+      details: error instanceof Error ? error.message : "Unknown error"
+    }, { status: 500 })
   }
 }

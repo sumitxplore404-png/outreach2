@@ -43,9 +43,17 @@ export function DashboardSidebar() {
 
   const loadSettings = async () => {
     try {
-      const response = await fetch("/api/settings")
+      setIsLoading(true)
+      const response = await fetch("/api/settings", {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
       if (response.ok) {
         const data: SettingsResponse = await response.json()
+        console.log('Loaded settings:', data)
         setOriginalSettings(data)
         setSettings({
           openaiApiKey: data.hasOpenaiKey ? data.openaiApiKey : "",
@@ -53,9 +61,14 @@ export function DashboardSidebar() {
           appPassword: data.hasAppPassword ? data.appPassword : "",
           ccRecipients: data.ccRecipients || "",
         })
+      } else {
+        const errorData = await response.json()
+        console.error("Failed to load settings:", errorData)
+        setErrorMessage(`Failed to load settings: ${errorData.error}`)
       }
     } catch (error) {
       console.error("Failed to load settings:", error)
+      setErrorMessage("Failed to load settings. Please check your connection.")
     } finally {
       setIsLoading(false)
     }
@@ -68,14 +81,32 @@ export function DashboardSidebar() {
   }
 
   const handleSaveSettings = async () => {
+    // Validation
     if (!settings.openaiApiKey || !settings.email || !settings.appPassword) {
       setSaveStatus("error")
-      setErrorMessage("All fields are required")
+      setErrorMessage("OpenAI API key, email, and app password are required")
+      return
+    }
+
+    if (!settings.openaiApiKey.startsWith("sk-")) {
+      setSaveStatus("error")
+      setErrorMessage("Invalid OpenAI API key format. Must start with 'sk-'")
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(settings.email)) {
+      setSaveStatus("error")
+      setErrorMessage("Invalid email format")
       return
     }
 
     setIsSaving(true)
+    setSaveStatus("idle")
+    setErrorMessage("")
+    
     try {
+      console.log('Saving settings...')
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: {
@@ -84,20 +115,26 @@ export function DashboardSidebar() {
         body: JSON.stringify(settings),
       })
 
+      console.log('Response status:', response.status)
       const data = await response.json()
+      console.log('Response data:', data)
 
       if (response.ok) {
         setSaveStatus("success")
         setErrorMessage("")
         // Reload settings to get the masked values
-        await loadSettings()
+        setTimeout(() => {
+          loadSettings()
+        }, 1000)
       } else {
         setSaveStatus("error")
-        setErrorMessage(data.error || "Failed to save settings")
+        setErrorMessage(data.error || data.details || "Failed to save settings")
+        console.error('Save error:', data)
       }
     } catch (error) {
+      console.error('Network error saving settings:', error)
       setSaveStatus("error")
-      setErrorMessage("Network error. Please try again.")
+      setErrorMessage("Network error. Please check your connection and try again.")
     } finally {
       setIsSaving(false)
     }
@@ -214,7 +251,7 @@ export function DashboardSidebar() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Comma-separated email addresses to CC on all sent emails
+                Comma-separated email addresses to CC on all sent emails (optional)
               </p>
             </div>
 
@@ -247,12 +284,12 @@ export function DashboardSidebar() {
               <p className="font-medium">Email Setup Instructions:</p>
               <p><strong>For Gmail:</strong></p>
               <p>1. Enable 2-factor authentication</p>
-              <p>2. Generate App Password in Google Account settings</p>
-              <p>3. Use the 16-character App Password</p>
+              <p>2. Go to Google Account → Security → App passwords</p>
+              <p>3. Generate App Password and use the 16-character code</p>
               <p><strong>For Outlook/Microsoft:</strong></p>
               <p>1. Enable 2-factor authentication</p>
-              <p>2. Generate App Password in Microsoft Account settings</p>
-              <p>3. Use the generated App Password</p>
+              <p>2. Go to Security settings → App passwords</p>
+              <p>3. Generate App Password and use the generated code</p>
             </div>
           </CardContent>
         </Card>
