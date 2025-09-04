@@ -74,16 +74,6 @@ export function DashboardSidebar() {
       return
     }
 
-    // Don't save if values haven't changed and are masked
-    const isApiKeyMasked = settings.openaiApiKey.startsWith("***")
-    const isPasswordMasked = settings.appPassword.startsWith("***")
-
-    if (isApiKeyMasked && isPasswordMasked && (settings.email === originalSettings?.email && settings.ccRecipients === originalSettings?.ccRecipients)) {
-      setSaveStatus("error")
-      setErrorMessage("No changes detected. Please enter new values to update.")
-      return
-    }
-
     setIsSaving(true)
     try {
       const response = await fetch("/api/settings", {
@@ -157,7 +147,7 @@ export function DashboardSidebar() {
                 <Input
                   id="openai-key"
                   type="password"
-                  placeholder={originalSettings?.hasOpenaiKey ? "API key is set" : "sk-..."}
+                  placeholder={originalSettings?.hasOpenaiKey ? "Enter new API key to update" : "sk-..."}
                   value={settings.openaiApiKey}
                   onChange={(e) => handleInputChange("openaiApiKey", e.target.value)}
                   className="pl-10"
@@ -197,7 +187,7 @@ export function DashboardSidebar() {
                 <Input
                   id="app-password"
                   type="password"
-                  placeholder={originalSettings?.hasAppPassword ? "Password is set" : "App password"}
+                  placeholder={originalSettings?.hasAppPassword ? "Enter new password to update" : "App password"}
                   value={settings.appPassword}
                   onChange={(e) => handleInputChange("appPassword", e.target.value)}
                   className="pl-10"

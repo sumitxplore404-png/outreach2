@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import { validateSettings } from "@/lib/settings"
+import { supabase } from "@/lib/supabase"
 import fs from "fs/promises"
 import path from "path"
 import { v4 as uuidv4 } from "uuid"
@@ -176,8 +177,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if settings are configured
-    const hasValidSettings = await validateSettings()
-    if (!hasValidSettings) {
+    // Instead of using validateSettings(), fetch settings directly from Supabase to avoid mismatch
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('*')
+      .single()
+
+    if (error || !settings || !settings.openai_api_key || !settings.email || !settings.app_password) {
       return NextResponse.json(
         { error: "Please configure your OpenAI API key and SMTP settings first" },
         { status: 400 },
