@@ -1,26 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-import fs from "fs/promises"
-import path from "path"
-
-const BATCHES_FILE = path.join(process.cwd(), "data", "batches.json")
-const TRACKING_FILE = path.join(process.cwd(), "data", "tracking.json")
-
-interface BatchRecord {
-  id: string
-  uploadTime: string
-  totalEmails: number
-  delivered: number
-  opened: number
-}
-
-interface TrackingRecord {
-  id: string
-  batchId: string
-  sentAt: string
-  openedAt?: string
-  openCount: number
-}
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
   try {
@@ -29,27 +9,22 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    let batches: BatchRecord[] = []
-    let tracking: TrackingRecord[] = []
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
 
-    // Load batches
-    try {
-      const batchData = await fs.readFile(BATCHES_FILE, "utf-8")
-      batches = JSON.parse(batchData)
-    } catch {
-      // File doesn't exist
-    }
+    // Fetch batches from Supabase for this user
+    const { data: batches, error } = await supabase
+      .from('batches')
+      .select('upload_time, total_emails, delivered, opened')
+      .eq('user_id', userId)
 
-    // Load tracking data
-    try {
-      const trackingData = await fs.readFile(TRACKING_FILE, "utf-8")
-      tracking = JSON.parse(trackingData)
-    } catch {
-      // File doesn't exist
+    if (error) {
+      console.error('Error fetching batches:', error)
+      throw error
     }
 
     // Calculate overall statistics
-    const totalSent = batches.reduce((sum, batch) => sum + batch.totalEmails, 0)
+    const totalSent = batches.reduce((sum, batch) => sum + batch.total_emails, 0)
     const totalDelivered = batches.reduce((sum, batch) => sum + batch.delivered, 0)
     const totalOpened = batches.reduce((sum, batch) => sum + batch.opened, 0)
     const averageOpenRate = totalDelivered > 0 ? (totalOpened / totalDelivered) * 100 : 0
@@ -58,9 +33,9 @@ export async function GET() {
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const recentBatches = batches.filter((batch) => new Date(batch.uploadTime) >= thirtyDaysAgo)
+    const recentBatches = batches.filter((batch) => new Date(batch.upload_time) >= thirtyDaysAgo)
 
-    const recentSent = recentBatches.reduce((sum, batch) => sum + batch.totalEmails, 0)
+    const recentSent = recentBatches.reduce((sum, batch) => sum + batch.total_emails, 0)
     const recentDelivered = recentBatches.reduce((sum, batch) => sum + batch.delivered, 0)
     const recentOpened = recentBatches.reduce((sum, batch) => sum + batch.opened, 0)
 

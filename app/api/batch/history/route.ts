@@ -24,7 +24,15 @@ export async function GET() {
     }
 
     // Remove contacts details for privacy
-    const sanitizedBatches = batches.map(({ contacts, ...batch }) => batch)
+    const sanitizedBatches = batches.map(({ contacts, upload_time, csv_name, total_emails, delivered, opened, open_rate, id }) => ({
+      id,
+      uploadTime: upload_time,
+      csvName: csv_name,
+      totalEmails: total_emails,
+      delivered,
+      opened,
+      openRate: open_rate,
+    }))
 
     return NextResponse.json({ batches: sanitizedBatches })
   } catch (error) {
