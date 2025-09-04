@@ -3,14 +3,14 @@ import { getSession } from "@/lib/auth"
 import { getBatch } from "@/lib/batch"
 import { getBatchTracking } from "@/lib/email"
 
-export async function GET(request: NextRequest, { params }: { params: { batchId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ batchId: string }> }) {
   try {
     const isAuthenticated = await getSession()
     if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { batchId } = params
+    const { batchId } = await params
 
     // Get batch data
     const batch = await getBatch(batchId)

@@ -289,8 +289,8 @@ async function updateBatchClickStats(batchId: string): Promise<void> {
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { trackingId: string } }) {
-  const trackingId = (await params).trackingId
+export async function GET(request: NextRequest, { params }: { params: Promise<{ trackingId: string }> }) {
+  const { trackingId } = await params
   const timestamp = new Date().toISOString()
   const ipAddress = getClientIP(request)
   const userAgent = request.headers.get('user-agent')
