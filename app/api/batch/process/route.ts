@@ -177,10 +177,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if settings are configured
-    // Instead of using validateSettings(), fetch settings directly from Supabase to avoid mismatch
+    // Fetch settings directly from Supabase using singleton pattern
     const { data: settings, error } = await supabase
       .from('settings')
       .select('*')
+      .eq('id', 'singleton')
       .single()
 
     if (error || !settings || !settings.openai_api_key || !settings.email || !settings.app_password) {

@@ -9,10 +9,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get settings from Supabase
+    // Get settings from Supabase using singleton pattern
     const { data: settings, error } = await supabase
       .from('settings')
       .select('*')
+      .eq('id', 'singleton')
       .single()
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
@@ -70,15 +71,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid OpenAI API key format" }, { status: 400 })
     }
 
-    // Update or insert settings in Supabase
+    // Update or insert settings in Supabase (singleton pattern)
     const { error } = await supabase
       .from('settings')
       .upsert({
+        id: 'singleton', // Use a fixed ID for singleton pattern
         openai_api_key: openaiApiKey,
         email,
         app_password: appPassword,
         cc_recipients: ccRecipients,
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id'
       })
 
     if (error) {
