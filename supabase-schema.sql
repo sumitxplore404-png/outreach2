@@ -71,6 +71,14 @@ INSERT INTO settings (id, openai_api_key, email, app_password, cc_recipients)
 VALUES ('550e8400-e29b-41d4-a716-446655440000', '', '', '', '')
 ON CONFLICT (id) DO NOTHING;
 
+-- Drop existing indexes if they exist and recreate them
+DROP INDEX IF EXISTS idx_contacts_batch_id;
+DROP INDEX IF EXISTS idx_contacts_email;
+DROP INDEX IF EXISTS idx_tracking_events_tracking_id;
+DROP INDEX IF EXISTS idx_tracking_events_timestamp;
+DROP INDEX IF EXISTS idx_tracking_events_event_type;
+DROP INDEX IF EXISTS idx_batches_upload_time;
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_contacts_batch_id ON contacts(batch_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
@@ -88,6 +96,11 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Drop existing triggers if they exist and recreate them
+DROP TRIGGER IF EXISTS update_batches_updated_at ON batches;
+DROP TRIGGER IF EXISTS update_contacts_updated_at ON contacts;
+DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
+
 -- Create triggers for updated_at
 CREATE TRIGGER update_batches_updated_at BEFORE UPDATE ON batches
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -103,6 +116,12 @@ ALTER TABLE batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tracking_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Allow all operations on batches" ON batches;
+DROP POLICY IF EXISTS "Allow all operations on contacts" ON contacts;
+DROP POLICY IF EXISTS "Allow all operations on tracking_events" ON tracking_events;
+DROP POLICY IF EXISTS "Allow all operations on settings" ON settings;
 
 -- Create policies (adjust based on your authentication needs)
 -- For now, allow all operations (you can restrict this later)
