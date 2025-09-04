@@ -201,6 +201,7 @@ export async function POST(request: NextRequest) {
     const batchId = uuidv4()
     const batch = {
       id: batchId,
+      user_id: userId,
       uploadTime: new Date().toISOString(),
       csvName: file.name,
       totalEmails: contacts.length,
