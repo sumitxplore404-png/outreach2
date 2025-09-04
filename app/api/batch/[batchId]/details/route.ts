@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { batchId:
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { batchId } = await params
+    const { batchId } = params
 
     // Get batch data
     const batch = await getBatch(batchId)
