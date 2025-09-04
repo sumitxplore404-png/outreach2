@@ -1,0 +1,17 @@
+[
+  {
+    "trackingId": "57d29f23-eed6-4dd5-8787-16ab6d9da38d",
+    "timestamp": "2025-09-03T07:35:08.161Z",
+    "eventType": "bot_open",
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    "country": "local",
+    "region": "local",
+    "city": "local",
+    "deviceType": "desktop",
+    "browser": "chrome",
+    "platform": "windows",
+    "isGenuine": false,
+    "url": "http://localhost:3000/unsubscribe?id=57d29f23-eed6-4dd5-8787-16ab6d9da38d"
+  }
+]

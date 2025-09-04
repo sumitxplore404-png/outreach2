@@ -1,0 +1,154 @@
+[
+  {
+    "id": "a2979c23-98fb-4519-936e-3273a2ca77d5",
+    "uploadTime": "2025-09-03T11:03:53.892Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 0,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumit@foreignadmits.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "6005fc66-9972-46e7-94e5-3607812f1f92",
+    "uploadTime": "2025-09-03T11:11:00.433Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumit@foreignadmits.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "8176647c-4c05-4d6f-8e27-5ce2b3c02af9",
+    "uploadTime": "2025-09-03T11:21:40.273Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "b308be63-9f77-4517-b4aa-3ff5bbbe32e0",
+    "uploadTime": "2025-09-03T11:41:23.487Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "b3201ebc-7176-4b83-9263-1896930f8fe9",
+    "uploadTime": "2025-09-03T19:57:01.462Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "8d25595d-f02b-4789-b84e-44d45410ad4b",
+    "uploadTime": "2025-09-03T20:18:25.300Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "1a280f55-2cba-4345-853e-bc5920ad6a86",
+    "uploadTime": "2025-09-03T20:28:42.131Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
+  },
+  {
+    "id": "f1f0600e-31ff-4877-af97-05411781ae18",
+    "uploadTime": "2025-09-04T03:57:27.673Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 1,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
+  }
+]

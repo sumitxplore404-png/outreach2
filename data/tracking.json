@@ -1,0 +1,73 @@
+[
+  {
+    "id": "974046ba-925a-4363-8598-9df8d273f5c0",
+    "batchId": "6005fc66-9972-46e7-94e5-3607812f1f92",
+    "contactName": "Sumit Saini",
+    "email": "sumit@foreignadmits.com",
+    "sentAt": "2025-09-03T11:11:42.837Z",
+    "openCount": 0,
+    "clickCount": 0,
+    "openEvents": [
+      {
+        "timestamp": "2025-09-03T20:07:19.179Z",
+        "ipAddress": "::1",
+        "userAgent": "Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.4768",
+        "isGenuine": false
+      }
+    ]
+  },
+  {
+    "id": "cbfd40b6-ff98-45fa-93cf-3c852f173b6d",
+    "batchId": "8176647c-4c05-4d6f-8e27-5ce2b3c02af9",
+    "contactName": "Sumit Saini",
+    "email": "sumitkumar969074@gmail.com",
+    "sentAt": "2025-09-03T11:22:13.870Z",
+    "openCount": 0,
+    "clickCount": 0
+  },
+  {
+    "id": "43981a3b-68ad-4c54-9300-0ee0422e3b0d",
+    "batchId": "b308be63-9f77-4517-b4aa-3ff5bbbe32e0",
+    "contactName": "Sumit Saini",
+    "email": "sumitkumar969074@gmail.com",
+    "sentAt": "2025-09-03T11:41:56.668Z",
+    "openCount": 0,
+    "clickCount": 0
+  },
+  {
+    "id": "a2220052-d599-4cba-8689-0b1e55200160",
+    "batchId": "b3201ebc-7176-4b83-9263-1896930f8fe9",
+    "contactName": "Sumit Saini",
+    "email": "sumitkumar969074@gmail.com",
+    "sentAt": "2025-09-03T19:57:42.796Z",
+    "openCount": 0,
+    "clickCount": 0
+  },
+  {
+    "id": "baad3261-b605-47e8-b9b3-0394ffa612bc",
+    "batchId": "8d25595d-f02b-4789-b84e-44d45410ad4b",
+    "contactName": "Sumit Saini",
+    "email": "sumitkumar969074@gmail.com",
+    "sentAt": "2025-09-03T20:18:45.172Z",
+    "openCount": 0,
+    "clickCount": 0
+  },
+  {
+    "id": "d65ebe8e-1f98-45f0-8e31-159eb62771a5",
+    "batchId": "1a280f55-2cba-4345-853e-bc5920ad6a86",
+    "contactName": "Sumit Saini",
+    "email": "sumitkumar969074@gmail.com",
+    "sentAt": "2025-09-03T20:29:02.051Z",
+    "openCount": 0,
+    "clickCount": 0
+  },
+  {
+    "id": "0c09c254-7dfa-4949-8986-5e810c1c9912",
+    "batchId": "f1f0600e-31ff-4877-af97-05411781ae18",
+    "contactName": "Sumit Saini",
+    "email": "sumitkumar969074@gmail.com",
+    "sentAt": "2025-09-04T03:58:19.371Z",
+    "openCount": 0,
+    "clickCount": 0
+  }
+]
