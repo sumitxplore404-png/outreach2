@@ -2,8 +2,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
 import { validateSettings } from "@/lib/settings"
 import { supabase } from "@/lib/supabase"
-import fs from "fs/promises"
-import path from "path"
 import { v4 as uuidv4 } from "uuid"
 
 interface CSVRow {
@@ -13,29 +11,6 @@ interface CSVRow {
   designation: string
   mail: string
   university: string
-}
-
-interface BatchRecord {
-  id: string
-  uploadTime: string
-  csvName: string
-  totalEmails: number
-  delivered: number
-  opened: number
-  openRate: number
-  contacts: CSVRow[]
-}
-
-const BATCHES_FILE = path.join(process.cwd(), "data", "batches.json")
-
-// Ensure data directory exists
-async function ensureDataDirectory() {
-  const dataDir = path.join(process.cwd(), "data")
-  try {
-    await fs.access(dataDir)
-  } catch {
-    await fs.mkdir(dataDir, { recursive: true })
-  }
 }
 
 // Parse CSV content with proper handling of quoted fields
@@ -153,20 +128,27 @@ function parseCSVLine(line: string): string[] {
   return result
 }
 
-// Load existing batches
-async function loadBatches(): Promise<BatchRecord[]> {
-  try {
-    const data = await fs.readFile(BATCHES_FILE, "utf-8")
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
-}
+// Save batch to Supabase
+async function saveBatch(batch: any): Promise<void> {
+  const { error } = await supabase
+    .from('batches')
+    .insert({
+      id: batch.id,
+      upload_time: batch.uploadTime,
+      csv_name: batch.csvName,
+      total_emails: batch.totalEmails,
+      delivered: batch.delivered,
+      opened: batch.opened,
+      clicked: 0,
+      open_rate: batch.openRate,
+      click_rate: 0,
+      contacts: batch.contacts
+    })
 
-// Save batches
-async function saveBatches(batches: BatchRecord[]): Promise<void> {
-  await ensureDataDirectory()
-  await fs.writeFile(BATCHES_FILE, JSON.stringify(batches, null, 2))
+  if (error) {
+    console.error("Error saving batch to Supabase:", error)
+    throw new Error("Failed to save batch")
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -214,7 +196,7 @@ export async function POST(request: NextRequest) {
 
     // Create batch record
     const batchId = uuidv4()
-    const batch: BatchRecord = {
+    const batch = {
       id: batchId,
       uploadTime: new Date().toISOString(),
       csvName: file.name,
@@ -226,9 +208,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save batch to storage
-    const batches = await loadBatches()
-    batches.push(batch)
-    await saveBatches(batches)
+    await saveBatch(batch)
 
     // Return success with batch info
     return NextResponse.json({

@@ -1,7 +1,4 @@
-import fs from "fs/promises"
-import path from "path"
-
-const BATCHES_FILE = path.join(process.cwd(), "data", "batches.json")
+import { supabase } from "./supabase"
 
 export interface Contact {
   country: string
@@ -42,9 +39,26 @@ export interface BatchRecord {
 
 export async function getBatch(batchId: string): Promise<BatchRecord | null> {
   try {
-    const data = await fs.readFile(BATCHES_FILE, "utf-8")
-    const batches: BatchRecord[] = JSON.parse(data)
-    return batches.find((batch) => batch.id === batchId) || null
+    const { data, error } = await supabase
+      .from('batches')
+      .select('*')
+      .eq('id', batchId)
+      .single()
+
+    if (error || !data) {
+      return null
+    }
+
+    return {
+      id: data.id,
+      uploadTime: data.upload_time,
+      csvName: data.csv_name,
+      totalEmails: data.total_emails,
+      delivered: data.delivered,
+      opened: data.opened,
+      openRate: data.open_rate,
+      contacts: data.contacts || []
+    }
   } catch {
     return null
   }
@@ -52,16 +66,19 @@ export async function getBatch(batchId: string): Promise<BatchRecord | null> {
 
 export async function updateBatchStats(batchId: string, delivered: number, opened: number): Promise<void> {
   try {
-    const data = await fs.readFile(BATCHES_FILE, "utf-8")
-    const batches: BatchRecord[] = JSON.parse(data)
+    const openRate = delivered > 0 ? (opened / delivered) * 100 : 0
 
-    const batchIndex = batches.findIndex((batch) => batch.id === batchId)
-    if (batchIndex !== -1) {
-      batches[batchIndex].delivered = delivered
-      batches[batchIndex].opened = opened
-      batches[batchIndex].openRate = delivered > 0 ? (opened / delivered) * 100 : 0
+    const { error } = await supabase
+      .from('batches')
+      .update({
+        delivered,
+        opened,
+        open_rate: openRate
+      })
+      .eq('id', batchId)
 
-      await fs.writeFile(BATCHES_FILE, JSON.stringify(batches, null, 2))
+    if (error) {
+      console.error("Failed to update batch stats:", error)
     }
   } catch (error) {
     console.error("Failed to update batch stats:", error)
