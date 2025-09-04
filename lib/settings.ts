@@ -1,7 +1,4 @@
-import fs from "fs/promises"
-import path from "path"
-
-const SETTINGS_FILE = path.join(process.cwd(), "data", "settings.json")
+import { supabase } from "./supabase"
 
 export interface Settings {
   openaiApiKey: string
@@ -12,9 +9,24 @@ export interface Settings {
 
 export async function getSettings(): Promise<Settings | null> {
   try {
-    const data = await fs.readFile(SETTINGS_FILE, "utf-8")
-    return JSON.parse(data) as Settings
+    const { data, error } = await supabase
+      .from('settings')
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error("Error fetching settings from Supabase:", error)
+      return null
+    }
+
+    return {
+      openaiApiKey: data.openai_api_key || "",
+      email: data.email || "",
+      appPassword: data.app_password || "",
+      ccRecipients: data.cc_recipients || ""
+    }
   } catch (error) {
+    console.error("Unexpected error fetching settings:", error)
     return null
   }
 }
