@@ -13,12 +13,8 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
-  // Enable SWC minification for faster builds
-  swcMinify: true,
-
   // Optimize bundle splitting
   webpack: (config, { isServer }) => {
-    // Optimize chunks
     if (!isServer) {
       config.optimization.splitChunks.cacheGroups = {
         ...config.optimization.splitChunks.cacheGroups,
@@ -34,17 +30,14 @@ const nextConfig = {
           chunks: 'all',
           priority: 20,
         },
-      }
+      };
     }
 
-    return config
+    return config;
   },
 
   // Enable compression
   compress: true,
+};
 
-  // Optimize fonts
-  optimizeFonts: true,
-}
-
-module.exports = nextConfig
+module.exports = nextConfig;
