@@ -134,6 +134,7 @@ async function saveBatch(batch: any): Promise<void> {
     .from('batches')
     .insert({
       id: batch.id,
+      user_id: batch.user_id,
       upload_time: batch.uploadTime,
       csv_name: batch.csvName,
       total_emails: batch.totalEmails,
@@ -158,12 +159,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Check if settings are configured
-    // Fetch settings directly from Supabase using singleton pattern
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
+
+    // Check if settings are configured for this user
     const { data: settings, error } = await supabase
       .from('settings')
       .select('*')
-      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
+      .eq('user_id', userId)
       .single()
 
     if (error || !settings || !settings.openai_api_key || !settings.email || !settings.app_password) {

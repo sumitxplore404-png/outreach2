@@ -1,27 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { supabase } from "@/lib/supabase"
 import fs from "fs/promises"
 import path from "path"
-
-const TRACKING_FILE = path.join(process.cwd(), "data", "tracking.json")
-
-interface TrackingRecord {
-  id: string
-  batchId: string
-  contactName: string
-  email: string
-  sentAt: string
-  openedAt?: string
-  openCount: number
-  clickCount?: number
-  openEvents?: OpenEvent[]
-}
-
-interface OpenEvent {
-  timestamp: string
-  ipAddress?: string
-  userAgent?: string
-  isGenuine?: boolean
-}
 
 // Get client IP address from request
 function getClientIP(request: NextRequest): string {
@@ -98,36 +78,39 @@ function isGenuineOpen(userAgent: string | null, ipAddress: string): boolean {
 }
 
 // Update batch open statistics
-async function updateBatchOpenStats(batchId: string): Promise<void> {
+async function updateBatchOpenStats(batchId: string, userId: string): Promise<void> {
   try {
-    const batchesFile = path.join(process.cwd(), "data", "batches.json")
+    // Get tracking events for this batch
+    const { data: trackingEvents, error } = await supabase
+      .from('tracking_events')
+      .select('email, event_type')
+      .eq('batch_id', batchId)
+      .eq('event_type', 'open')
+      .eq('user_id', userId)
 
-    // Check if batches file exists
-    try {
-      await fs.access(batchesFile)
-    } catch {
-      // Batches file doesn't exist, skip update
+    if (error) {
+      console.error("Error fetching tracking events:", error)
       return
     }
 
-    const trackingData = await fs.readFile(TRACKING_FILE, "utf-8")
-    const tracking: TrackingRecord[] = JSON.parse(trackingData)
-
     // Count unique opens for this batch
-    const batchTracking = tracking.filter((record) => record.batchId === batchId)
-    const uniqueOpens = batchTracking.filter((record) => record.openCount > 0).length
-    const totalDelivered = batchTracking.length
+    const uniqueOpens = new Set(trackingEvents?.map(event => event.email)).size
+    const totalDelivered = trackingEvents?.length || 0
 
     // Update batch record
-    const batchData = await fs.readFile(batchesFile, "utf-8")
-    const batches = JSON.parse(batchData)
+    const openRate = totalDelivered > 0 ? (uniqueOpens / totalDelivered) * 100 : 0
 
-    const batchIndex = batches.findIndex((batch: any) => batch.id === batchId)
-    if (batchIndex !== -1) {
-      batches[batchIndex].opened = uniqueOpens
-      batches[batchIndex].openRate = totalDelivered > 0 ? (uniqueOpens / totalDelivered) * 100 : 0
+    const { error: updateError } = await supabase
+      .from('batches')
+      .update({
+        opened: uniqueOpens,
+        open_rate: openRate
+      })
+      .eq('id', batchId)
+      .eq('user_id', userId)
 
-      await fs.writeFile(batchesFile, JSON.stringify(batches, null, 2))
+    if (updateError) {
+      console.error("Failed to update batch open stats:", updateError)
     }
   } catch (error) {
     console.error("Failed to update batch open stats:", error)
@@ -174,17 +157,16 @@ export async function GET(request: NextRequest) {
   console.log(`Email open tracking - ID: ${trackingId}, IP: ${ipAddress}, Genuine: ${isGenuine}`)
 
   try {
-    // Ensure data directory exists
-    const dataDir = path.dirname(TRACKING_FILE)
-    await fs.mkdir(dataDir, { recursive: true })
+    // Find tracking record in Supabase
+    const { data: trackingRecord, error } = await supabase
+      .from('tracking_events')
+      .select('batch_id, email, contact_name')
+      .eq('id', trackingId)
+      .eq('user_id', "user@example.com")
+      .single()
 
-    // Load tracking data
-    let tracking: TrackingRecord[] = []
-    try {
-      const data = await fs.readFile(TRACKING_FILE, "utf-8")
-      tracking = JSON.parse(data)
-    } catch {
-      console.log(`Tracking file not found for ID: ${trackingId}`)
+    if (error || !trackingRecord) {
+      console.log(`Tracking record not found for ID: ${trackingId}`)
       // Return image anyway
       const imagePath = path.join(process.cwd(), "public", "track_open.png")
       try {
@@ -209,41 +191,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Find and update tracking record
-    const recordIndex = tracking.findIndex((record) => record.id === trackingId)
-    if (recordIndex !== -1) {
-      const record = tracking[recordIndex]
+    // Only count genuine opens
+    if (isGenuine) {
+      // Insert open event into tracking_events table
+      const { error: insertError } = await supabase
+        .from('tracking_events')
+        .insert({
+          id: trackingId,
+          batch_id: trackingRecord.batch_id,
+          email: trackingRecord.email,
+          contact_name: trackingRecord.contact_name,
+          event_type: 'open',
+          timestamp: timestamp,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          is_genuine: isGenuine,
+          user_id: "user@example.com"
+        })
 
-      // Only count genuine opens
-      if (isGenuine) {
-        record.openCount = (record.openCount || 0) + 1
-        if (!record.openedAt) {
-          record.openedAt = timestamp
-        }
-        console.log(`Genuine email open tracked - ${record.email} (Count: ${record.openCount})`)
+      if (insertError) {
+        console.error("Error inserting tracking event:", insertError)
       } else {
-        console.log(`Bot/prefetch open detected - ${record.email}`)
+        console.log(`Genuine email open tracked - ${trackingRecord.email}`)
+        // Update batch statistics
+        await updateBatchOpenStats(trackingRecord.batch_id, "user@example.com")
       }
-
-      // Add open event
-      if (!record.openEvents) {
-        record.openEvents = []
-      }
-
-      record.openEvents.push({
-        timestamp,
-        ipAddress,
-        userAgent: userAgent || undefined,
-        isGenuine
-      })
-
-      // Save updated tracking
-      await fs.writeFile(TRACKING_FILE, JSON.stringify(tracking, null, 2))
-
-      // Update batch statistics
-      if (isGenuine) {
-        await updateBatchOpenStats(record.batchId)
-      }
+    } else {
+      console.log(`Bot/prefetch open detected - ${trackingRecord.email}`)
     }
 
     // Return the tracking image

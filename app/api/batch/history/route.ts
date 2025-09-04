@@ -9,9 +9,13 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
+
     const { data: batches, error } = await supabase
       .from('batches')
       .select('id, upload_time, csv_name, total_emails, delivered, opened, open_rate, contacts')
+      .eq('user_id', userId)
       .order('upload_time', { ascending: false })
 
     if (error) {

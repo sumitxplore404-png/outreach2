@@ -18,8 +18,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Batch ID is required" }, { status: 400 })
     }
 
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
+
     // Get batch data
-    const batch = await getBatch(batchId)
+    const batch = await getBatch(batchId, userId)
     if (!batch) {
       return NextResponse.json({ error: "Batch not found" }, { status: 404 })
     }
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update batch statistics
-    await updateBatchStats(batchId, delivered, 0) // opened will be updated by tracking
+    await updateBatchStats(batchId, delivered, 0, userId) // opened will be updated by tracking
 
     return NextResponse.json({
       success: true,

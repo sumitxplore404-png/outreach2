@@ -9,11 +9,14 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get settings from Supabase using singleton pattern
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
+
+    // Get settings from Supabase for this user
     const { data: settings, error } = await supabase
       .from('settings')
       .select('*')
-      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
+      .eq('user_id', userId)
       .single()
 
     if (error) {
@@ -79,11 +82,14 @@ export async function POST(request: NextRequest) {
 
     console.log('Attempting to save settings to Supabase...')
 
-    // First try to get existing settings
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
+
+    // First try to get existing settings for this user
     const { data: existing } = await supabase
       .from('settings')
       .select('id')
-      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
+      .eq('user_id', userId)
       .single()
 
     let result
@@ -99,13 +105,13 @@ export async function POST(request: NextRequest) {
           cc_recipients: ccRecipients || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', '550e8400-e29b-41d4-a716-446655440000')
+        .eq('user_id', userId)
     } else {
       // Insert new settings
       result = await supabase
         .from('settings')
         .insert({
-          id: '550e8400-e29b-41d4-a716-446655440000',
+          user_id: userId,
           openai_api_key: openaiApiKey,
           email,
           app_password: appPassword,

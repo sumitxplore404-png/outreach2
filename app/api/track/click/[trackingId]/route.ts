@@ -164,13 +164,14 @@ async function getLocationFromIP(ip: string): Promise<{ country?: string; region
 }
 
 // Update batch click statistics in Supabase
-async function updateBatchClickStats(batchId: string): Promise<void> {
+async function updateBatchClickStats(batchId: string, userId: string): Promise<void> {
   try {
     // Get all contacts for this batch
     const { data: contacts, error: contactsError } = await supabase
       .from('contacts')
       .select('click_count')
       .eq('batch_id', batchId)
+      .eq('user_id', userId)
 
     if (contactsError) {
       console.error("Failed to fetch contacts for batch stats:", contactsError)
@@ -191,6 +192,7 @@ async function updateBatchClickStats(batchId: string): Promise<void> {
         updated_at: new Date().toISOString()
       })
       .eq('id', batchId)
+      .eq('user_id', userId)
 
     if (updateError) {
       console.error("Failed to update batch click stats:", updateError)
@@ -214,6 +216,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // Log the click attempt immediately
   console.log(`Email click tracking - ID: ${trackingId}, IP: ${ipAddress}, URL: ${url}`)
 
+  // Get user identifier (using email as user_id for simplicity)
+  const userId = "user@example.com" // TODO: Get actual user ID from session
+
   try {
     // Check if this is a genuine click (not from bots/prefetchers)
     const isGenuine = isGenuineClick(userAgent, ipAddress)
@@ -234,7 +239,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         platform: platform,
         url: url,
         is_genuine: isGenuine,
-        timestamp: timestamp
+        timestamp: timestamp,
+        user_id: userId
       })
 
     if (trackingError) {
@@ -246,6 +252,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .from('contacts')
       .select('id, batch_id, email, click_count, clicked_at')
       .eq('id', trackingId)
+      .eq('user_id', userId)
       .single()
 
     if (contactError && contactError.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -267,6 +274,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             updated_at: timestamp
           })
           .eq('id', trackingId)
+          .eq('user_id', userId)
 
         if (updateError) {
           console.error('Failed to update contact click count:', updateError)
@@ -274,7 +282,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           console.log(`Genuine email click tracked - ${contact.email} (Count: ${newClickCount})`)
 
           // Update batch statistics
-          await updateBatchClickStats(contact.batch_id)
+          await updateBatchClickStats(contact.batch_id, userId)
         }
       } else {
         console.log(`Bot/prefetch click detected - ${contact.email}`)
@@ -298,7 +306,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           ip_address: ipAddress,
           user_agent: userAgent,
           url: url,
-          timestamp: timestamp
+          timestamp: timestamp,
+          user_id: userId
         })
     } catch (logError) {
       console.error('Failed to log error event:', logError)

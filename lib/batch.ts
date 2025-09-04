@@ -37,13 +37,19 @@ export interface BatchRecord {
   contacts: Contact[]
 }
 
-export async function getBatch(batchId: string): Promise<BatchRecord | null> {
+export async function getBatch(batchId: string, userId?: string): Promise<BatchRecord | null> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('batches')
       .select('*')
       .eq('id', batchId)
-      .single()
+
+    // If userId is provided, filter by user
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query.single()
 
     if (error || !data) {
       return null
@@ -64,11 +70,11 @@ export async function getBatch(batchId: string): Promise<BatchRecord | null> {
   }
 }
 
-export async function updateBatchStats(batchId: string, delivered: number, opened: number): Promise<void> {
+export async function updateBatchStats(batchId: string, delivered: number, opened: number, userId?: string): Promise<void> {
   try {
     const openRate = delivered > 0 ? (opened / delivered) * 100 : 0
 
-    const { error } = await supabase
+    let query = supabase
       .from('batches')
       .update({
         delivered,
@@ -76,6 +82,13 @@ export async function updateBatchStats(batchId: string, delivered: number, opene
         open_rate: openRate
       })
       .eq('id', batchId)
+
+    // If userId is provided, filter by user
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { error } = await query
 
     if (error) {
       console.error("Failed to update batch stats:", error)

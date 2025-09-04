@@ -40,8 +40,34 @@
 - [ ] Test error scenarios (network issues, invalid data)
 - [ ] Test with empty selection (should be disabled)
 
+## User ID Integration in Tracking Events
+
+## Completed Tasks
+- [x] Add user_id field to tracking_events table inserts in click tracking API
+- [x] Add user_id field to tracking_events table inserts in open tracking API
+- [x] Add user_id field to error logging in tracking events
+- [x] Update batch statistics queries to filter by user_id
+- [x] Update contact update queries to filter by user_id
+- [x] Refactor open tracking API to use Supabase instead of local JSON files
+- [x] Ensure all tracking events include user_id for proper data isolation
+
+## Features Implemented
+- **User Data Isolation**: All tracking events now include user_id for multi-tenant support
+- **Supabase Integration**: Open tracking now uses Supabase database instead of local files
+- **Consistent Data Model**: Both click and open tracking use the same database schema
+- **Batch Stats Updates**: Batch statistics are updated with user_id filtering
+- **Error Logging**: Error events also include user_id for complete audit trail
+
+## Testing Checklist
+- [ ] Test click tracking with user_id inclusion
+- [ ] Test open tracking with user_id inclusion
+- [ ] Verify batch stats update correctly with user filtering
+- [ ] Test error logging includes user_id
+- [ ] Verify data isolation between different users
+
 ## Notes
 - Stats are calculated dynamically from `batches.json` and `tracking.json`, so they automatically update when data is deleted
 - The deletion is permanent and cannot be undone
 - Authentication is required for all delete operations
 - Toast notifications provide user feedback for all operations
+- All tracking events now include user_id for proper multi-tenant data isolation

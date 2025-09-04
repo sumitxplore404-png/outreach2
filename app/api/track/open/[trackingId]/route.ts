@@ -1,51 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import fs from "fs/promises"
-import path from "path"
-
-const TRACKING_FILE = path.join(process.cwd(), "data", "tracking.json")
-const TRACKING_LOGS_FILE = path.join(process.cwd(), "data", "tracking-logs.json")
-
-interface TrackingRecord {
-  id: string
-  batchId: string
-  contactName: string
-  email: string
-  sentAt: string
-  openedAt?: string
-  openCount: number
-  clickCount?: number
-  openEvents?: OpenEvent[]
-  clickEvents?: any[]
-}
-
-interface OpenEvent {
-  timestamp: string
-  ipAddress?: string
-  userAgent?: string
-  country?: string
-  region?: string
-  city?: string
-  deviceType?: string
-  browser?: string
-  platform?: string
-  isGenuine?: boolean
-}
-
-interface TrackingLog {
-  trackingId: string
-  timestamp: string
-  eventType: 'open' | 'bot_open' | 'click' | 'error'
-  ipAddress?: string
-  userAgent?: string
-  country?: string
-  region?: string
-  city?: string
-  deviceType?: string
-  browser?: string
-  platform?: string
-  error?: string
-  isGenuine?: boolean
-}
+import { supabase } from "@/lib/supabase"
 
 // Get client IP address from request
 function getClientIP(request: NextRequest): string {
@@ -214,65 +168,39 @@ async function getLocationFromIP(ip: string): Promise<{ country?: string; region
   return { country: 'unknown', region: 'unknown', city: 'unknown' }
 }
 
-// Log tracking event
-async function logTrackingEvent(log: TrackingLog): Promise<void> {
+async function updateBatchOpenStats(batchId: string, userId: string): Promise<void> {
   try {
-    // Ensure data directory exists
-    const dataDir = path.dirname(TRACKING_LOGS_FILE)
-    await fs.mkdir(dataDir, { recursive: true })
+    // Get tracking events for this batch
+    const { data: trackingEvents, error } = await supabase
+      .from('tracking_events')
+      .select('email, event_type')
+      .eq('batch_id', batchId)
+      .eq('event_type', 'open')
+      .eq('user_id', userId)
 
-    let logs: TrackingLog[] = []
-    try {
-      const data = await fs.readFile(TRACKING_LOGS_FILE, 'utf-8')
-      logs = JSON.parse(data)
-    } catch {
-      // File doesn't exist, start with empty array
-    }
-
-    logs.push(log)
-    
-    // Keep only last 10000 logs to prevent file from growing too large
-    if (logs.length > 10000) {
-      logs = logs.slice(-10000)
-    }
-    
-    await fs.writeFile(TRACKING_LOGS_FILE, JSON.stringify(logs, null, 2))
-  } catch (error) {
-    console.error('Failed to log tracking event:', error)
-  }
-}
-
-// Update batch open statistics
-async function updateBatchOpenStats(batchId: string): Promise<void> {
-  try {
-    const batchesFile = path.join(process.cwd(), "data", "batches.json")
-    
-    // Check if batches file exists
-    try {
-      await fs.access(batchesFile)
-    } catch {
-      // Batches file doesn't exist, skip update
+    if (error) {
+      console.error("Error fetching tracking events:", error)
       return
     }
 
-    const trackingData = await fs.readFile(TRACKING_FILE, "utf-8")
-    const tracking: TrackingRecord[] = JSON.parse(trackingData)
-
     // Count unique opens for this batch
-    const batchTracking = tracking.filter((record) => record.batchId === batchId)
-    const uniqueOpens = batchTracking.filter((record) => record.openCount > 0).length
-    const totalDelivered = batchTracking.length
+    const uniqueOpens = new Set(trackingEvents?.map(event => event.email)).size
+    const totalDelivered = trackingEvents?.length || 0
 
     // Update batch record
-    const batchData = await fs.readFile(batchesFile, "utf-8")
-    const batches = JSON.parse(batchData)
+    const openRate = totalDelivered > 0 ? (uniqueOpens / totalDelivered) * 100 : 0
 
-    const batchIndex = batches.findIndex((batch: any) => batch.id === batchId)
-    if (batchIndex !== -1) {
-      batches[batchIndex].opened = uniqueOpens
-      batches[batchIndex].openRate = totalDelivered > 0 ? (uniqueOpens / totalDelivered) * 100 : 0
+    const { error: updateError } = await supabase
+      .from('batches')
+      .update({
+        opened: uniqueOpens,
+        open_rate: openRate
+      })
+      .eq('id', batchId)
+      .eq('user_id', userId)
 
-      await fs.writeFile(batchesFile, JSON.stringify(batches, null, 2))
+    if (updateError) {
+      console.error("Failed to update batch open stats:", updateError)
     }
   } catch (error) {
     console.error("Failed to update batch open stats:", error)
@@ -291,86 +219,58 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   console.log(`Email open tracking - ID: ${trackingId}, IP: ${ipAddress}, UA: ${userAgent?.substring(0, 100)}`)
 
   try {
-    // Check if this is a genuine open (not from bots/prefetchers)
+    // Check if this is a genuine open (not from bots, prefetchers)
     const isGenuine = isGenuineOpen(userAgent, ipAddress)
-    
-    // Log the tracking attempt
-    await logTrackingEvent({
-      trackingId,
-      timestamp,
-      eventType: isGenuine ? 'open' : 'bot_open',
-      ipAddress,
-      userAgent: userAgent || undefined,
-      ...location,
-      deviceType,
-      browser,
-      platform,
-      isGenuine
-    })
 
-    // Ensure data directory exists
-    const dataDir = path.dirname(TRACKING_FILE)
-    await fs.mkdir(dataDir, { recursive: true })
+    // Find tracking record in Supabase
+    const { data: trackingRecord, error } = await supabase
+      .from('tracking_events')
+      .select('batch_id, email, contact_name')
+      .eq('id', trackingId)
+      .eq('user_id', "user@example.com")
+      .single()
 
-    // Load tracking data
-    let tracking: TrackingRecord[] = []
-    try {
-      const data = await fs.readFile(TRACKING_FILE, "utf-8")
-      tracking = JSON.parse(data)
-    } catch {
-      // File doesn't exist, return pixel anyway
-      console.log(`Tracking file not found for ID: ${trackingId}`)
+    if (error || !trackingRecord) {
+      console.log(`Tracking record not found for ID: ${trackingId}`)
+      // Return pixel anyway
       return new NextResponse(PIXEL_DATA, {
         headers: {
           "Content-Type": "image/png",
           "Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache",
           "Expires": "0",
+          "Access-Control-Allow-Origin": "*",
         },
       })
     }
 
-    // Find and update tracking record
-    const recordIndex = tracking.findIndex((record) => record.id === trackingId)
-    if (recordIndex !== -1) {
-      const record = tracking[recordIndex]
+    // Only count genuine opens
+    if (isGenuine) {
+      // Insert open event into tracking_events table
+      const { error: insertError } = await supabase
+        .from('tracking_events')
+        .insert({
+          id: trackingId,
+          batch_id: trackingRecord.batch_id,
+          email: trackingRecord.email,
+          contact_name: trackingRecord.contact_name,
+          event_type: 'open',
+          timestamp: timestamp,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          is_genuine: isGenuine,
+          user_id: "user@example.com"
+        })
 
-      // Only count genuine opens (not from bots/prefetchers)
-      if (isGenuine) {
-        record.openCount = (record.openCount || 0) + 1
-        if (!record.openedAt) {
-          record.openedAt = timestamp
-        }
-        console.log(`Genuine email open tracked - ${record.email} (Count: ${record.openCount})`)
+      if (insertError) {
+        console.error("Error inserting tracking event:", insertError)
       } else {
-        console.log(`Bot/prefetch open detected - ${record.email}`)
-      }
-
-      // Always add detailed open event (even for bots for analytics)
-      if (!record.openEvents) {
-        record.openEvents = []
-      }
-      
-      record.openEvents.push({
-        timestamp,
-        ipAddress,
-        userAgent: userAgent || undefined,
-        ...location,
-        deviceType,
-        browser,
-        platform,
-        isGenuine
-      })
-
-      // Save updated tracking
-      await fs.writeFile(TRACKING_FILE, JSON.stringify(tracking, null, 2))
-
-      // Update batch statistics (only for genuine opens)
-      if (isGenuine) {
-        await updateBatchOpenStats(record.batchId)
+        console.log(`Genuine email open tracked - ${trackingRecord.email}`)
+        // Update batch statistics
+        await updateBatchOpenStats(trackingRecord.batch_id, "user@example.com")
       }
     } else {
-      console.log(`Tracking record not found for ID: ${trackingId}`)
+      console.log(`Bot/prefetch open detected - ${trackingRecord.email}`)
     }
 
     // Return 1x1 transparent pixel
@@ -385,17 +285,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     })
   } catch (error) {
     console.error("Tracking error:", error)
-    
-    // Log the error
-    await logTrackingEvent({
-      trackingId,
-      timestamp,
-      eventType: 'error',
-      ipAddress,
-      userAgent: userAgent || undefined,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    })
-    
+
+    // Log error event
+    try {
+      await supabase
+        .from('tracking_events')
+        .insert({
+          id: trackingId,
+          event_type: 'error',
+          timestamp: timestamp,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          user_id: "user@example.com"
+        })
+    } catch (logError) {
+      console.error('Failed to log error event:', logError)
+    }
+
     // Always return pixel even on error
     return new NextResponse(PIXEL_DATA, {
       headers: {

@@ -7,6 +7,7 @@ ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 -- Create batches table
 CREATE TABLE IF NOT EXISTS batches (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
   upload_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   csv_name TEXT NOT NULL,
   total_emails INTEGER NOT NULL DEFAULT 0,
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS batches (
 -- Create contacts table
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
   batch_id UUID REFERENCES batches(id) ON DELETE CASCADE,
   name TEXT,
   email TEXT NOT NULL,
@@ -39,6 +41,7 @@ CREATE TABLE IF NOT EXISTS contacts (
 -- Create tracking_events table for detailed analytics
 CREATE TABLE IF NOT EXISTS tracking_events (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL,
   tracking_id TEXT NOT NULL,
   event_type TEXT CHECK (event_type IN ('open', 'click', 'bounce', 'bot_open')),
   ip_address INET,
@@ -55,9 +58,10 @@ CREATE TABLE IF NOT EXISTS tracking_events (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create settings table (singleton pattern with UUID)
+-- Create settings table (per-user settings)
 CREATE TABLE IF NOT EXISTS settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
   openai_api_key TEXT,
   email TEXT,
   app_password TEXT,

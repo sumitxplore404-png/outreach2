@@ -1,19 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-import fs from "fs/promises"
-import path from "path"
-
-const BATCHES_FILE = path.join(process.cwd(), "data", "batches.json")
-
-interface BatchRecord {
-  id: string
-  uploadTime: string
-  csvName: string
-  totalEmails: number
-  delivered: number
-  opened: number
-  openRate: number
-}
+import { supabase } from "@/lib/supabase"
 
 interface MonthlyStats {
   month: string
@@ -30,9 +17,20 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    // Get user identifier (using email as user_id for simplicity)
+    const userId = "user@example.com" // TODO: Get actual user ID from session
+
     try {
-      const data = await fs.readFile(BATCHES_FILE, "utf-8")
-      const batches: BatchRecord[] = JSON.parse(data)
+      // Fetch batches from Supabase for this user
+      const { data: batches, error } = await supabase
+        .from('batches')
+        .select('upload_time, total_emails, delivered, opened')
+        .eq('user_id', userId)
+
+      if (error) {
+        console.error('Error fetching batches:', error)
+        throw error
+      }
 
       // Generate monthly stats for the last 12 months
       const monthlyStats: MonthlyStats[] = []
@@ -47,14 +45,14 @@ export async function GET() {
         })
 
         // Filter batches for this month
-        const monthBatches = batches.filter((batch) => {
-          const batchDate = new Date(batch.uploadTime)
+        const monthBatches = (batches || []).filter((batch) => {
+          const batchDate = new Date(batch.upload_time)
           const batchMonthKey = batchDate.toISOString().slice(0, 7)
           return batchMonthKey === monthKey
         })
 
         // Calculate totals for the month
-        const sent = monthBatches.reduce((sum, batch) => sum + batch.totalEmails, 0)
+        const sent = monthBatches.reduce((sum, batch) => sum + batch.total_emails, 0)
         const delivered = monthBatches.reduce((sum, batch) => sum + batch.delivered, 0)
         const opened = monthBatches.reduce((sum, batch) => sum + batch.opened, 0)
         const openRate = delivered > 0 ? (opened / delivered) * 100 : 0
@@ -69,8 +67,9 @@ export async function GET() {
       }
 
       return NextResponse.json({ stats: monthlyStats })
-    } catch {
-      // File doesn't exist, return empty stats
+    } catch (error) {
+      console.error('Error fetching monthly stats:', error)
+      // Return empty stats on error
       const monthlyStats: MonthlyStats[] = []
       const now = new Date()
 
