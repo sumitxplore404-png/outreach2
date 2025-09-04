@@ -126,28 +126,6 @@ async function getLocationFromIP(ip: string): Promise<{ country?: string; region
   }
 
   try {
-    // You can integrate with free IP geolocation services like:
-    // - ipapi.co (free tier: 1000 requests/day)
-    // - ipinfo.io (free tier: 50,000 requests/month)
-    // - geojs.io (free)
-
-    // Example with ipapi.co (uncomment to use):
-    /*
-    const response = await fetch(`https://ipapi.co/${ip}/json/`, {
-      headers: { 'User-Agent': 'Foreign-Admits-Email-Tracker/1.0' },
-      timeout: 3000
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        country: data.country_name || 'unknown',
-        region: data.region || 'unknown',
-        city: data.city || 'unknown'
-      };
-    }
-    */
-
     // Simple fallback based on IP ranges (for demo purposes)
     if (ip.includes('.') && !ip.includes(':')) {
       // IPv4 - simple country guess based on first octet
@@ -161,45 +139,6 @@ async function getLocationFromIP(ip: string): Promise<{ country?: string; region
   }
 
   return { country: 'unknown', region: 'unknown', city: 'unknown' }
-}
-
-// Update batch click statistics in Supabase
-async function updateBatchClickStats(batchId: string): Promise<void> {
-  try {
-    // Get all contacts for this batch
-    const { data: contacts, error: contactsError } = await supabase
-      .from('contacts')
-      .select('click_count')
-      .eq('batch_id', batchId)
-
-    if (contactsError) {
-      console.error("Failed to fetch contacts for batch stats:", contactsError)
-      return
-    }
-
-    // Calculate click statistics
-    const totalContacts = contacts?.length || 0
-    const clickedContacts = contacts?.filter(contact => (contact.click_count || 0) > 0).length || 0
-    const clickRate = totalContacts > 0 ? (clickedContacts / totalContacts) * 100 : 0
-
-    // Update batch statistics
-    const { error: updateError } = await supabase
-      .from('batches')
-      .update({
-        clicked: clickedContacts,
-        click_rate: clickRate,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', batchId)
-
-    if (updateError) {
-      console.error("Failed to update batch click stats:", updateError)
-    } else {
-      console.log(`Updated batch ${batchId} stats: ${clickedContacts}/${totalContacts} clicks (${clickRate.toFixed(1)}%)`)
-    }
-  } catch (error) {
-    console.error("Failed to update batch click stats:", error)
-  }
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ trackingId: string }> }) {
@@ -233,75 +172,89 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         browser: browser,
         platform: platform,
         url: url,
-        is_genuine: isGenuine,
-        timestamp: timestamp
+        timestamp: timestamp,
+        is_genuine: isGenuine
       })
 
     if (trackingError) {
-      console.error('Failed to insert tracking event:', trackingError)
+      console.error('Supabase tracking event insert error:', trackingError)
     }
 
-    // Find the contact record and update click count
-    const { data: contact, error: contactError } = await supabase
-      .from('contacts')
-      .select('id, batch_id, email, click_count, clicked_at')
-      .eq('id', trackingId)
-      .single()
+    // Find the contact record and update click count if genuine
+    if (isGenuine) {
+      const { data: contact, error: contactError } = await supabase
+        .from('contacts')
+        .select('id, batch_id, click_count')
+        .eq('id', trackingId)
+        .single()
 
-    if (contactError && contactError.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('Failed to fetch contact:', contactError)
-      return NextResponse.redirect(url)
-    }
-
-    if (contact) {
-      // Only count genuine clicks (not from bots/prefetchers)
-      if (isGenuine) {
-        const newClickCount = (contact.click_count || 0) + 1
-
-        // Update contact with new click count and timestamp
+      if (contact && !contactError) {
+        // Update click count
         const { error: updateError } = await supabase
           .from('contacts')
           .update({
-            click_count: newClickCount,
+            click_count: (contact.click_count || 0) + 1,
             clicked_at: timestamp,
             updated_at: timestamp
           })
           .eq('id', trackingId)
 
         if (updateError) {
-          console.error('Failed to update contact click count:', updateError)
-        } else {
-          console.log(`Genuine email click tracked - ${contact.email} (Count: ${newClickCount})`)
-
-          // Update batch statistics
-          await updateBatchClickStats(contact.batch_id)
+          console.error('Supabase contact update error:', updateError)
         }
+
+        // Update batch statistics
+        const { data: batchContacts, error: batchError } = await supabase
+          .from('contacts')
+          .select('click_count')
+          .eq('batch_id', contact.batch_id)
+
+        if (!batchError && batchContacts) {
+          const totalClicks = batchContacts.reduce((sum, c) => sum + (c.click_count || 0), 0)
+          const totalContacts = batchContacts.length
+          const clickRate = totalContacts > 0 ? (totalClicks / totalContacts) * 100 : 0
+
+          const { error: batchUpdateError } = await supabase
+            .from('batches')
+            .update({
+              clicked: totalClicks,
+              click_rate: clickRate,
+              updated_at: timestamp
+            })
+            .eq('id', contact.batch_id)
+
+          if (batchUpdateError) {
+            console.error('Supabase batch update error:', batchUpdateError)
+          }
+        }
+
+        console.log(`Genuine email click tracked - Contact ID: ${trackingId}`)
       } else {
-        console.log(`Bot/prefetch click detected - ${contact.email}`)
+        console.log(`Contact record not found for click ID: ${trackingId}`)
       }
     } else {
-      console.log(`Contact record not found for tracking ID: ${trackingId}`)
+      console.log(`Bot/prefetch click detected - ID: ${trackingId}`)
     }
 
-    // Always redirect to the original URL
+    // Redirect to the original URL
     return NextResponse.redirect(url)
   } catch (error) {
     console.error("Click tracking error:", error)
 
     // Log error event
-    try {
-      await supabase
-        .from('tracking_events')
-        .insert({
-          tracking_id: trackingId,
-          event_type: 'error',
-          ip_address: ipAddress,
-          user_agent: userAgent,
-          url: url,
-          timestamp: timestamp
-        })
-    } catch (logError) {
-      console.error('Failed to log error event:', logError)
+    const { error: errorLog } = await supabase
+      .from('tracking_events')
+      .insert({
+        tracking_id: trackingId,
+        event_type: 'error',
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        timestamp: timestamp,
+        is_genuine: false
+      })
+
+    if (errorLog) {
+      console.error('Error logging failed:', errorLog)
     }
 
     // Always redirect even on error

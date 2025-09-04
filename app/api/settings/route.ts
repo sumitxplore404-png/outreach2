@@ -1,28 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-import fs from "fs/promises"
-import path from "path"
+import { supabase, type Settings } from "@/lib/supabase"
 
-const SETTINGS_FILE = path.join(process.cwd(), "data", "settings.json")
-
-interface Settings {
-  openaiApiKey: string
-  email: string
-  appPassword: string
-  ccRecipients?: string
-}
-
-// Ensure data directory exists
-async function ensureDataDirectory() {
-  const dataDir = path.join(process.cwd(), "data")
-  try {
-    await fs.access(dataDir)
-  } catch {
-    await fs.mkdir(dataDir, { recursive: true })
-  }
-}
-
-// GET - Retrieve settings
 export async function GET() {
   try {
     const isAuthenticated = await getSession()
@@ -30,37 +9,41 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    await ensureDataDirectory()
+    // Get settings from Supabase
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('*')
+      .single()
 
-    try {
-      const data = await fs.readFile(SETTINGS_FILE, "utf-8")
-      const settings = JSON.parse(data) as Settings
-
-      // Return settings with masked password for security
-      return NextResponse.json({
-        openaiApiKey: settings.openaiApiKey ? "***" + settings.openaiApiKey.slice(-4) : "",
-        email: settings.email,
-        appPassword: settings.appPassword ? "***" + settings.appPassword.slice(-4) : "",
-        ccRecipients: settings.ccRecipients || "",
-        hasOpenaiKey: !!settings.openaiApiKey,
-        hasAppPassword: !!settings.appPassword,
-      })
-    } catch (error) {
-      // File doesn't exist or is invalid, return empty settings
-      return NextResponse.json({
-        openaiApiKey: "",
-        smtpEmail: "",
-        smtpPassword: "",
-        hasOpenaiKey: false,
-        hasSmtpPassword: false,
-      })
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('Settings fetch error:', error)
+      return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 })
     }
+
+    // Return settings with masked password for security
+    const safeSettings = settings ? {
+      openaiApiKey: settings.openai_api_key ? "***" + settings.openai_api_key.slice(-4) : "",
+      email: settings.email || "",
+      appPassword: settings.app_password ? "***" + settings.app_password.slice(-4) : "",
+      ccRecipients: settings.cc_recipients || "",
+      hasOpenaiKey: !!settings.openai_api_key,
+      hasAppPassword: !!settings.app_password,
+    } : {
+      openaiApiKey: "",
+      email: "",
+      appPassword: "",
+      ccRecipients: "",
+      hasOpenaiKey: false,
+      hasAppPassword: false,
+    }
+
+    return NextResponse.json(safeSettings)
   } catch (error) {
+    console.error('Settings GET error:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
 
-// POST - Save settings
 export async function POST(request: NextRequest) {
   try {
     const isAuthenticated = await getSession()
@@ -87,19 +70,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid OpenAI API key format" }, { status: 400 })
     }
 
-    await ensureDataDirectory()
+    // Update or insert settings in Supabase
+    const { error } = await supabase
+      .from('settings')
+      .upsert({
+        openai_api_key: openaiApiKey,
+        email,
+        app_password: appPassword,
+        cc_recipients: ccRecipients,
+        updated_at: new Date().toISOString()
+      })
 
-    const settings: Settings = {
-      openaiApiKey,
-      email,
-      appPassword,
-      ccRecipients,
+    if (error) {
+      console.error('Settings save error:', error)
+      return NextResponse.json({ error: "Failed to save settings" }, { status: 500 })
     }
-
-    await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2))
 
     return NextResponse.json({ success: true, message: "Settings saved successfully" })
   } catch (error) {
+    console.error('Settings POST error:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

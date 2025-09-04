@@ -150,5 +150,24 @@
         "university": "Yale University"
       }
     ]
+  },
+  {
+    "id": "e12a9e55-3626-4010-a37a-480bb6d8ed5f",
+    "uploadTime": "2025-09-04T05:23:45.241Z",
+    "csvName": "contacts.csv",
+    "totalEmails": 1,
+    "delivered": 0,
+    "opened": 0,
+    "openRate": 0,
+    "contacts": [
+      {
+        "country": "India",
+        "states/city": "New Haven, CT",
+        "name": "Sumit Saini",
+        "designation": "Senior Associate Director, Study Abroad",
+        "mail": "sumitkumar969074@gmail.com",
+        "university": "Yale University"
+      }
+    ]
   }
 ]

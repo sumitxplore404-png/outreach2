@@ -1,30 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSession } from "@/lib/auth"
-import fs from "fs/promises"
-import path from "path"
-
-const BATCHES_FILE = path.join(process.cwd(), "data", "batches.json")
-const TRACKING_FILE = path.join(process.cwd(), "data", "tracking.json")
-
-interface BatchRecord {
-  id: string
-  uploadTime: string
-  csvName: string
-  totalEmails: number
-  delivered: number
-  opened: number
-  openRate: number
-  contacts: any[]
-}
-
-interface TrackingRecord {
-  id: string
-  batchId: string
-  sentAt: string
-  openedAt?: string
-  openCount: number
-  email: string
-}
+import { supabase } from "@/lib/supabase"
 
 export async function GET() {
   try {
@@ -33,21 +9,22 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    try {
-      const data = await fs.readFile(BATCHES_FILE, "utf-8")
-      const batches: BatchRecord[] = JSON.parse(data)
+    const { data: batches, error } = await supabase
+      .from('batches')
+      .select('id, upload_time, csv_name, total_emails, delivered, opened, open_rate, contacts')
+      .order('upload_time', { ascending: false })
 
-      // Sort by upload time (newest first) and remove contact details for privacy
-      const sanitizedBatches = batches
-        .map(({ contacts, ...batch }) => batch)
-        .sort((a, b) => new Date(b.uploadTime).getTime() - new Date(a.uploadTime).getTime())
-
-      return NextResponse.json({ batches: sanitizedBatches })
-    } catch {
-      // File doesn't exist, return empty array
+    if (error) {
+      console.error('Supabase fetch batches error:', error)
       return NextResponse.json({ batches: [] })
     }
+
+    // Remove contacts details for privacy
+    const sanitizedBatches = batches.map(({ contacts, ...batch }) => batch)
+
+    return NextResponse.json({ batches: sanitizedBatches })
   } catch (error) {
+    console.error('Batch history GET error:', error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -65,33 +42,36 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Invalid batch IDs" }, { status: 400 })
     }
 
-    // Read current batches
-    let batches: BatchRecord[] = []
-    try {
-      const batchData = await fs.readFile(BATCHES_FILE, "utf-8")
-      batches = JSON.parse(batchData)
-    } catch {
-      return NextResponse.json({ error: "No batches found" }, { status: 404 })
+    // Delete batches and related contacts and tracking events in Supabase
+    const { error: deleteTrackingError } = await supabase
+      .from('tracking_events')
+      .delete()
+      .in('tracking_id', batchIds)
+
+    if (deleteTrackingError) {
+      console.error('Error deleting tracking events:', deleteTrackingError)
+      return NextResponse.json({ error: "Failed to delete tracking events" }, { status: 500 })
     }
 
-    // Read current tracking data
-    let tracking: TrackingRecord[] = []
-    try {
-      const trackingData = await fs.readFile(TRACKING_FILE, "utf-8")
-      tracking = JSON.parse(trackingData)
-    } catch {
-      // Tracking file might not exist, that's okay
+    const { error: deleteContactsError } = await supabase
+      .from('contacts')
+      .delete()
+      .in('batch_id', batchIds)
+
+    if (deleteContactsError) {
+      console.error('Error deleting contacts:', deleteContactsError)
+      return NextResponse.json({ error: "Failed to delete contacts" }, { status: 500 })
     }
 
-    // Filter out batches to delete
-    const updatedBatches = batches.filter(batch => !batchIds.includes(batch.id))
+    const { error: deleteBatchesError } = await supabase
+      .from('batches')
+      .delete()
+      .in('id', batchIds)
 
-    // Filter out tracking records for deleted batches
-    const updatedTracking = tracking.filter(record => !batchIds.includes(record.batchId))
-
-    // Write updated data back to files
-    await fs.writeFile(BATCHES_FILE, JSON.stringify(updatedBatches, null, 2))
-    await fs.writeFile(TRACKING_FILE, JSON.stringify(updatedTracking, null, 2))
+    if (deleteBatchesError) {
+      console.error('Error deleting batches:', deleteBatchesError)
+      return NextResponse.json({ error: "Failed to delete batches" }, { status: 500 })
+    }
 
     return NextResponse.json({
       message: `Successfully deleted ${batchIds.length} batch(es)`,
