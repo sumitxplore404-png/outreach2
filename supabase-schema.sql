@@ -55,9 +55,9 @@ CREATE TABLE IF NOT EXISTS tracking_events (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create settings table (singleton pattern)
+-- Create settings table (singleton pattern with UUID)
 CREATE TABLE IF NOT EXISTS settings (
-  id TEXT PRIMARY KEY DEFAULT 'singleton',
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   openai_api_key TEXT,
   email TEXT,
   app_password TEXT,
@@ -66,8 +66,10 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Ensure only one row exists (singleton constraint)
-CREATE UNIQUE INDEX IF NOT EXISTS settings_singleton_idx ON settings(id);
+-- Insert the singleton row with a fixed UUID
+INSERT INTO settings (id, openai_api_key, email, app_password, cc_recipients)
+VALUES ('550e8400-e29b-41d4-a716-446655440000', '', '', '', '')
+ON CONFLICT (id) DO NOTHING;
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_contacts_batch_id ON contacts(batch_id);

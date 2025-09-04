@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
     const { data: settings, error } = await supabase
       .from('settings')
       .select('*')
-      .eq('id', 'singleton')
+      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
       .single()
 
     if (error || !settings || !settings.openai_api_key || !settings.email || !settings.app_password) {

@@ -12,7 +12,7 @@ export async function getSettings(): Promise<Settings | null> {
     const { data, error } = await supabase
       .from('settings')
       .select('*')
-      .eq('id', 'singleton')
+      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
       .single()
 
     if (error) {

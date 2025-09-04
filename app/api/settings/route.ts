@@ -13,14 +13,14 @@ export async function GET() {
     const { data: settings, error } = await supabase
       .from('settings')
       .select('*')
-      .eq('id', 'singleton')
+      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
       .single()
 
     if (error) {
       console.error('Settings fetch error:', error)
       
       // If no settings found, return empty defaults
-      if (error.code === 'PGRST116') {
+      if (error.code === 'PGRST116' || error.message.includes('No rows found')) {
         return NextResponse.json({
           openaiApiKey: "",
           email: "",
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await supabase
       .from('settings')
       .select('id')
-      .eq('id', 'singleton')
+      .eq('id', '550e8400-e29b-41d4-a716-446655440000')
       .single()
 
     let result
@@ -99,13 +99,13 @@ export async function POST(request: NextRequest) {
           cc_recipients: ccRecipients || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', 'singleton')
+        .eq('id', '550e8400-e29b-41d4-a716-446655440000')
     } else {
       // Insert new settings
       result = await supabase
         .from('settings')
         .insert({
-          id: 'singleton',
+          id: '550e8400-e29b-41d4-a716-446655440000',
           openai_api_key: openaiApiKey,
           email,
           app_password: appPassword,
