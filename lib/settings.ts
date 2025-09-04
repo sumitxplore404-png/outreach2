@@ -9,24 +9,6 @@ export interface Settings {
 
 export async function getSettings(): Promise<Settings | null> {
   try {
-    // First, ensure the singleton row exists
-    const { error: upsertError } = await supabase
-      .from('settings')
-      .upsert({
-        id: 'singleton',
-        openai_api_key: '',
-        email: '',
-        app_password: '',
-        cc_recipients: ''
-      }, {
-        onConflict: 'id'
-      })
-
-    if (upsertError) {
-      console.error("Error ensuring singleton settings row:", upsertError)
-    }
-
-    // Now fetch the singleton row
     const { data, error } = await supabase
       .from('settings')
       .select('*')
