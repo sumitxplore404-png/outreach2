@@ -13,6 +13,10 @@ interface SettingsState {
   email: string
   appPassword: string
   ccRecipients: string
+  senderName: string
+  senderDesignation: string
+  senderPhone: string
+  senderCompany: string
 }
 
 interface SettingsResponse {
@@ -20,6 +24,10 @@ interface SettingsResponse {
   email: string
   appPassword: string
   ccRecipients: string
+  senderName: string
+  senderDesignation: string
+  senderPhone: string
+  senderCompany: string
   hasOpenaiKey: boolean
   hasAppPassword: boolean
 }
@@ -30,6 +38,10 @@ export function DashboardSidebar() {
     email: "",
     appPassword: "",
     ccRecipients: "",
+    senderName: "",
+    senderDesignation: "",
+    senderPhone: "",
+    senderCompany: "",
   })
   const [originalSettings, setOriginalSettings] = useState<SettingsResponse | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -60,6 +72,10 @@ export function DashboardSidebar() {
           email: data.email || "",
           appPassword: data.hasAppPassword ? data.appPassword : "",
           ccRecipients: data.ccRecipients || "",
+          senderName: data.senderName || "",
+          senderDesignation: data.senderDesignation || "",
+          senderPhone: data.senderPhone || "",
+          senderCompany: data.senderCompany || "",
         })
       } else {
         const errorData = await response.json()
@@ -253,6 +269,59 @@ export function DashboardSidebar() {
               <p className="text-xs text-muted-foreground">
                 Comma-separated email addresses to CC on all sent emails (optional)
               </p>
+            </div>
+
+            {/* Sender Personalization Section */}
+            <div className="space-y-2 pt-4 border-t">
+              <Label htmlFor="sender-name" className="text-sm font-medium">
+                Sender Name
+              </Label>
+              <Input
+                id="sender-name"
+                type="text"
+                placeholder="Your Name"
+                value={settings.senderName}
+                onChange={(e) => handleInputChange("senderName", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sender-designation" className="text-sm font-medium">
+                Sender Designation
+              </Label>
+              <Input
+                id="sender-designation"
+                type="text"
+                placeholder="Your Designation"
+                value={settings.senderDesignation}
+                onChange={(e) => handleInputChange("senderDesignation", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sender-phone" className="text-sm font-medium">
+                Sender Phone
+              </Label>
+              <Input
+                id="sender-phone"
+                type="text"
+                placeholder="Your Phone Number"
+                value={settings.senderPhone}
+                onChange={(e) => handleInputChange("senderPhone", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sender-company" className="text-sm font-medium">
+                Sender Company
+              </Label>
+              <Input
+                id="sender-company"
+                type="text"
+                placeholder="Your Company"
+                value={settings.senderCompany}
+                onChange={(e) => handleInputChange("senderCompany", e.target.value)}
+              />
             </div>
 
             {saveStatus === "success" && (

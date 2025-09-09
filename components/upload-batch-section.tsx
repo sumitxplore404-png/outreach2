@@ -7,10 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Upload, FileText, Send, AlertCircle, CheckCircle, Loader2, Mail, Eye, Sparkles } from "lucide-react"
+import { Upload, FileText, Send, AlertCircle, CheckCircle, Loader2, Mail, Eye, Sparkles, MessageSquare } from "lucide-react"
 import { EmailPreviewList } from "./email-preview-list"
 
 interface ProcessResponse {
@@ -62,6 +64,8 @@ export function UploadBatchSection() {
   const [generatedEmails, setGeneratedEmails] = useState<GeneratedEmail[]>([])
   const [sendResults, setSendResults] = useState<SendResponse | null>(null)
   const [globalCC, setGlobalCC] = useState<string>("")
+  const [useCustomPrompt, setUseCustomPrompt] = useState<boolean>(false)
+  const [customPrompt, setCustomPrompt] = useState<string>("")
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -156,9 +160,35 @@ export function UploadBatchSection() {
     const progressInterval = simulateProgress(90)
 
     try {
-      const requestBody: any = { batchId: batchInfo.id }
+      // Fetch sender details from settings
+      const settingsResponse = await fetch("/api/settings", {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      let senderDetails = {}
+      if (settingsResponse.ok) {
+        const settings = await settingsResponse.json()
+        senderDetails = {
+          senderName: settings.senderName || "",
+          senderDesignation: settings.senderDesignation || "",
+          senderPhone: settings.senderPhone || "",
+          senderCompany: settings.senderCompany || ""
+        }
+      }
+
+      const requestBody: any = {
+        batchId: batchInfo.id,
+        ...senderDetails
+      }
+
       if (globalCC.trim()) {
         requestBody.globalCC = globalCC.trim().split(',').map((email: string) => email.trim()).filter((email: string) => email.length > 0)
+      }
+      if (useCustomPrompt && customPrompt.trim()) {
+        requestBody.customPrompt = customPrompt.trim()
       }
 
       const response = await fetch("/api/batch/generate", {
@@ -314,6 +344,43 @@ export function UploadBatchSection() {
             <p className="text-xs text-muted-foreground">
               Add email addresses that will be CC'd on all emails in this batch. Separate multiple emails with commas.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="use-custom-prompt"
+                checked={useCustomPrompt}
+                onCheckedChange={(checked) => setUseCustomPrompt(checked as boolean)}
+                disabled={isProcessing || isGenerating || isSending}
+              />
+              <Label htmlFor="use-custom-prompt" className="text-sm font-medium flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Use Custom Prompt
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enable this to provide a custom prompt for AI email generation instead of using the default prompt.
+            </p>
+            {useCustomPrompt && (
+              <div className="space-y-2">
+                <Label htmlFor="custom-prompt" className="text-sm font-medium">
+                  Custom Prompt
+                </Label>
+                <Textarea
+                  id="custom-prompt"
+                  placeholder="Enter your custom prompt for AI email generation. Include instructions for tone, content, and any specific requirements..."
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  disabled={isProcessing || isGenerating || isSending}
+                  className="min-h-[100px] resize-none"
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  The AI will use this prompt to generate personalized emails. Be specific about the tone, content, and any requirements.
+                </p>
+              </div>
+            )}
           </div>
 
           {(status === "processing" || status === "sending") && (

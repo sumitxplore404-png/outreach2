@@ -66,6 +66,10 @@ CREATE TABLE IF NOT EXISTS settings (
   email TEXT,
   app_password TEXT,
   cc_recipients TEXT,
+  sender_name TEXT,
+  sender_designation TEXT,
+  sender_phone TEXT,
+  sender_company TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -5,6 +5,10 @@ export interface Settings {
   email: string
   appPassword: string
   ccRecipients?: string // Comma-separated list of CC email addresses
+  senderName?: string
+  senderDesignation?: string
+  senderPhone?: string
+  senderCompany?: string
 }
 
 export async function getSettings(): Promise<Settings | null> {
@@ -24,7 +28,11 @@ export async function getSettings(): Promise<Settings | null> {
       openaiApiKey: data.openai_api_key || "",
       email: data.email || "",
       appPassword: data.app_password || "",
-      ccRecipients: data.cc_recipients || ""
+      ccRecipients: data.cc_recipients || "",
+      senderName: data.sender_name || "",
+      senderDesignation: data.sender_designation || "",
+      senderPhone: data.sender_phone || "",
+      senderCompany: data.sender_company || ""
     }
   } catch (error) {
     console.error("Unexpected error fetching settings:", error)

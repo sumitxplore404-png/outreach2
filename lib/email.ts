@@ -14,7 +14,7 @@ interface TrackingRecord {
   openCount: number
   clickCount?: number
   openEvents?: OpenEvent[]
-  clickEvents?: any[]
+  clickEvents?: ClickEvent[]
 }
 
 interface OpenEvent {
@@ -54,8 +54,8 @@ interface EmailOptions {
   trackingId: string
   batchId: string
   contactName: string
-  trackingBaseUrl: string // Add this to pass your domain
-  cc?: string[] // Optional CC recipients array
+  trackingBaseUrl: string
+  cc?: string[]
 }
 
 interface ContactData {
@@ -79,7 +79,7 @@ interface ContactData {
 }
 
 // Generate hyper-personalized email using OpenAI with detailed prompt
-export async function generateEmail(contact: ContactData, apiKey: string): Promise<{
+export async function generateEmail(contact: ContactData, apiKey: string, customPrompt?: string): Promise<{
   subjectOptions: string[]
   emailVersionA: string
   emailVersionB: string
@@ -88,84 +88,17 @@ export async function generateEmail(contact: ContactData, apiKey: string): Promi
   assumptions: string[]
 } | null> {
   try {
-    // Construct the prompt with placeholders filled from contact data
-    const prompt = `
-Hyper-Personalized B2B Cold Email Generator (${contact.product_name})
+    // Use the provided prompt (which now includes sender info and proper formatting requirements)
+    const prompt = customPrompt || `Write a professional cold email for ${contact.product_name} to ${contact.recipient_person_name}.
 
-You are a senior B2B copywriter and growth PM. Write a concise, high-signal outreach email tailored to the recipient university. Use only the data provided. Do not invent facts. If any input is missing, infer lightly from nearby context (industry, ICP) but flag assumptions in a short notes blockâ€”donâ€™t ask questions.
+EXACT OUTPUT FORMAT REQUIRED:
+**SUBJECT LINE:**
+Option 1: [subject line - max 8 words]
+Option 2: [subject line - max 8 words]
+Option 3: [subject line - max 8 words]
 
-OBJECTIVE
-
-Primary Goal/CTA: ${contact.cta_goal} (choose the tightest CTA copy for this goal: lead qualification | lead gen | demo call | pilot | license | intro meeting).
-
-Success criteria: 1) feels written only for ${contact.recipient_university_name}, 2) ties their business model to ${contact.product_name} with a present-day trigger, 3) gives 1â€“2 proof metrics, 4) crisp CTA with time options.
-
-PRODUCT CONTEXT (${contact.product_name})
-
-One-liner: ${contact.product_oneliner}
-
-Core users: ${contact.product_core_users}
-
-Top capabilities (keep to 3â€“5): ${contact.product_features_bulleted}
-
-Outcomes / proof (pick the best 1â€“3, numeric if available): ${contact.product_outcomes_metrics}
-
-Select success stories (name + one result): ${contact.product_caselets}
-
-RECIPIENT CONTEXT (Personalization Inputs)
-
-Recipient's Name: ${contact.recipient_person_name}
-
-University: ${contact.recipient_university_name} | Website/LinkedIn notes: ${contact.recipient_public_notes}
-
-Primary/secondary/tertiary businesses: ${contact.recipient_business_map}
-
-ICP they serve & geos: ${contact.recipient_icp_geos}
-
-Current offers/pricing cues (if any): ${contact.recipient_offers}
-
-Recent trigger/trend relevant to them (news, policy, seasonality, intake cycle, tech shift): ${contact.relevant_trigger}
-
-Pain or workflow friction that matches ${contact.product_name}: ${contact.recipient_pain}
-
-Lead source & relationship (cold/warm/referral/event): ${contact.lead_source}
-
-Prospect persona & seniority: ${contact.prospect_persona}
-
-WRITING RULES
-
-Length: 90â€“140 words (email body). No fluff. Lead with university-specific relevance, then the why-now trigger, then ${contact.product_name} fit + one metric, then CTA.
-
-Tone: crisp, helpful, non-salesy, operator-to-operator. Professional etiquette; avoid hype words (â€œrevolutionizeâ€, â€œcutting-edgeâ€).
-
-Make the bridge explicit: â€œBecause you do X for Y, and trend Z is happening, ${contact.product_name}â€™s Aâ†’B lifts metric C.â€
-
-Use one credible number or proof point; keep it believable.
-
-End with a single, low-friction CTA with 2 time slots or a yes/no path.
-
-Optional P.S.: 1 resource link or 1-line case proof (only if provided in inputs).
-
-Make the email HTML-friendly (use <p> tags, <br> for line breaks).
-
-Start with a warm greeting using the recipient's name.
-
-End with 'Warm regards, Foreignadmits | visamonk.ai'.
-
-OUTPUT FORMAT (exactly this order)
-
-Subject (3 options) â€” â‰¤7 words each, specific to ${contact.recipient_university_name}
-
-Email (Version A: ROI angle)
-
-Email (Version B: Workflow angle)
-
-LinkedIn DM (â‰¤260 chars)
-
-Value Map (3 bullets) â€” {Recipient Need â†’ ${contact.product_name} feature â†’ Expected lift}
-
-Assumptions/Notes â€” bullet any light inferences you made
-`
+**EMAIL BODY:**
+[Complete email content]`
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -178,7 +111,7 @@ Assumptions/Notes â€” bullet any light inferences you made
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that generates hyper-personalized B2B cold emails based on the provided prompt.",
+            content: "You are a professional email marketing assistant. Always follow the exact output format specified in the prompt. Generate personalized, professional cold emails with complete signatures.",
           },
           {
             role: "user",
@@ -186,7 +119,7 @@ Assumptions/Notes â€” bullet any light inferences you made
           },
         ],
         temperature: 0.7,
-        max_tokens: 400,
+        max_tokens: 500, // Increased to ensure complete responses
       }),
     })
 
@@ -196,44 +129,143 @@ Assumptions/Notes â€” bullet any light inferences you made
     }
 
     const data = await response.json()
-    const emailContent = data.choices[0]?.message?.content?.trim() || null
+    let emailContent = data.choices[0]?.message?.content?.trim() || null
 
     if (!emailContent) {
       return null
     }
 
+    console.log("Raw AI Response:", emailContent)
+
     // Parse the response content into structured parts
     let subjectOptions: string[] = []
-    let emailVersionA = "Error: Could not parse email content. Please try again." // fallback
+    let emailVersionA = emailContent
 
-    // Extract subject options
-    const subjectMatch = emailContent.match(/\*\*Subject.*?\*\*\s*(.*?)(?=\*\*|$)/s)
-    if (subjectMatch) {
-      const optionsText = subjectMatch[1].trim()
-      subjectOptions = optionsText.split(/\d+\.\s*/).filter((s: string) => s.trim()).map((s: string) => s.trim())
+    // Extract subject lines with improved patterns
+    const subjectPatterns = [
+      /\*\*SUBJECT LINE:\*\*\s*([\s\S]*?)(?=\*\*EMAIL BODY:|\*\*[A-Z]|$)/i,
+      /\*\*Subject.*?:\*\*\s*([\s\S]*?)(?=\*\*Email|\*\*[A-Z]|$)/i,
+      /Subject.*?:\s*([\s\S]*?)(?=\*\*Email|Email.*?:|\*\*[A-Z]|$)/i
+    ]
+
+    for (const pattern of subjectPatterns) {
+      const subjectMatch = emailContent.match(pattern)
+      if (subjectMatch && subjectMatch[1]) {
+        const subjectSection = subjectMatch[1].trim()
+        
+        // Extract individual options
+        const optionLines = subjectSection.split('\n')
+          .map((line: string) => line.trim())
+          .filter((line: string) => line.length > 0)
+          
+        for (const line of optionLines) {
+          // Match "Option X:" pattern
+          const optionMatch = line.match(/Option\s+\d+:\s*(.+)/i)
+          if (optionMatch && optionMatch[1]) {
+            subjectOptions.push(optionMatch[1].trim())
+          } else if (line.match(/^\d+\.\s*(.+)/) || line.match(/^-\s*(.+)/) || line.match(/^•\s*(.+)/)) {
+            // Handle numbered or bulleted options
+            const cleanOption = line.replace(/^\d+\.\s*|^-\s*|^•\s*/, '').trim()
+            if (cleanOption.length > 3 && cleanOption.length <= 100) {
+              subjectOptions.push(cleanOption)
+            }
+          }
+        }
+        
+        if (subjectOptions.length > 0) break
+      }
     }
 
-    // Extract Email Version A
-    const emailMatch = emailContent.match(/\*\*Email \(Version A:.*?\)\*\*\s*(.*?)(?=\*\*|$)/s)
-    if (emailMatch) {
-      emailVersionA = emailMatch[1].trim()
+    // Extract email body with improved patterns
+    const emailPatterns = [
+      /\*\*EMAIL BODY:\*\*\s*([\s\S]*?)$/i,
+      /\*\*Email.*?:\*\*\s*([\s\S]*?)$/i,
+      /Email.*?:\s*([\s\S]*?)$/i
+    ]
+
+    for (const pattern of emailPatterns) {
+      const emailMatch = emailContent.match(pattern)
+      if (emailMatch && emailMatch[1]) {
+        emailVersionA = emailMatch[1].trim()
+        break
+      }
     }
 
-    // Debug logging
-    console.log('Parsed subject options:', subjectOptions)
-    console.log('Parsed email body length:', emailVersionA.length)
-    console.log('Email body preview:', emailVersionA.substring(0, 100) + '...')
+    // If no email body section found, look for greeting patterns
+    if (emailVersionA === emailContent || emailVersionA.includes("**SUBJECT LINE:**")) {
+      const greetingMatch = emailContent.match(/(Dear|Hi|Hello)\s+[^,\n]+,[\s\S]*$/i)
+      if (greetingMatch) {
+        emailVersionA = greetingMatch[0].trim()
+      } else {
+        // Remove subject section if present
+        emailVersionA = emailContent.replace(/\*\*SUBJECT LINE:\*\*[\s\S]*?(?=\*\*EMAIL BODY:|\*\*[A-Z]|$)/i, '').trim()
+        emailVersionA = emailVersionA.replace(/\*\*EMAIL BODY:\*\*\s*/i, '').trim()
+      }
+    }
 
-    // For now, return only the parsed parts, ignoring the extras
+    // Ensure we have at least one subject
+    if (subjectOptions.length === 0) {
+      // Try to extract from the beginning of content if it looks like subjects
+      const lines = emailContent.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0)
+      const firstFewLines = lines.slice(0, 5)
+
+      for (const line of firstFewLines) {
+        if (line.length < 100 && 
+            !line.includes('Dear') && 
+            !line.includes('Hi') && 
+            !line.includes('Hello') &&
+            !line.includes('**') &&
+            line.length > 10) {
+          subjectOptions.push(line)
+        }
+      }
+      
+      // Ultimate fallback
+      if (subjectOptions.length === 0) {
+        subjectOptions = [`Partnership opportunity with ${contact.recipient_university_name}`]
+      }
+    }
+
+    // Clean subjects and ensure reasonable length
+    subjectOptions = subjectOptions
+      .filter(subject => subject.length >= 10 && subject.length <= 100)
+      .map(subject => subject.replace(/^["']|["']$/g, '')) // Remove surrounding quotes
+      .slice(0, 3) // Max 3 options
+
+    // Ensure we have proper email content
+    if (emailVersionA.length < 50 || 
+        emailVersionA.includes("**SUBJECT") || 
+        !emailVersionA.match(/(Dear|Hi|Hello)/i)) {
+      
+      // Last resort: create a basic structure
+      emailVersionA = `Dear ${contact.recipient_person_name},
+
+I hope this email finds you well. I'm reaching out to introduce ${contact.product_name}, which could benefit ${contact.recipient_university_name}.
+
+Our platform helps streamline visa interview preparation and has shown impressive results including saving 30-45 minutes per student assessment.
+
+I'd love to schedule a brief call to discuss how this could help your international student services.
+
+Best regards,
+[Sender Name]
+[Sender Designation]  
+[Sender Phone]
+[Sender Company]`
+    }
+
+    console.log('Parsed subjects:', subjectOptions)
+    console.log('Email body length:', emailVersionA.length)
+    console.log('Email preview:', emailVersionA.substring(0, 200) + '...')
+
     return {
       subjectOptions: subjectOptions,
       emailVersionA: emailVersionA,
-      emailVersionB: "", // Not needed
-      linkedInDM: "", // Not needed
-      valueMap: [], // Not needed
-      assumptions: [], // Not needed
+      emailVersionB: "",
+      linkedInDM: "",
+      valueMap: [],
+      assumptions: [],
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Email generation error:", error)
     return null
   }
@@ -246,7 +278,7 @@ function createTrackingLink(originalUrl: string, trackingId: string, trackingBas
 }
 
 function addTrackingToEmail(htmlContent: string, trackingId: string, trackingBaseUrl: string): string {
-  // Add tracking pixel (1x1 transparent image) that goes through our tracking endpoint
+  // Add tracking pixel
   const trackingPixelUrl = `${trackingBaseUrl}/api/track/open?id=${trackingId}`
   const trackingPixel = `<img src="${trackingPixelUrl}" alt="" width="1" height="1" style="display:none !important; visibility:hidden !important; opacity:0 !important; color:transparent !important; height:1px !important; width:1px !important;" border="0" />`
 
@@ -257,7 +289,7 @@ function addTrackingToEmail(htmlContent: string, trackingId: string, trackingBas
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Foreign Admits</title>
+    <title>ForeignAdmits | VisaMonk.ai</title>
     <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; }
         .email-content { padding: 20px; }
@@ -278,10 +310,6 @@ function addTrackingToEmail(htmlContent: string, trackingId: string, trackingBas
         ${htmlContent}
         
         <div class="footer">
-            <p>Best regards,<br>
-            Foreign Admits Team<br>
-            <a href="https://visamonk.ai">visamonk.ai</a></p>
-            
             <p style="font-size: 10px; color: #999;">
                 If you no longer wish to receive these emails, you can 
                 <a href="${trackingBaseUrl}/unsubscribe?id=${trackingId}" style="color: #999;">unsubscribe here</a>.
@@ -309,12 +337,12 @@ function addTrackingToEmail(htmlContent: string, trackingId: string, trackingBas
 // Convert HTML to plain text
 function htmlToText(html: string): string {
   return html
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
-    .replace(/&amp;/g, '&') // Replace &amp; with &
-    .replace(/</g, '<') // Replace < with <
-    .replace(/>/g, '>') // Replace > with >
-    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
     .trim()
 }
 
@@ -336,7 +364,6 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       port: 587,
       secure: false,
       tls: {
-        ciphers: 'SSLv3',
         rejectUnauthorized: false
       }
     } : {
@@ -344,7 +371,6 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       port: 587,
       secure: false,
       tls: {
-        ciphers: 'SSLv3',
         rejectUnauthorized: false
       }
     }
@@ -372,13 +398,13 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     // Send email
     const mailOptions: any = {
-      from: `"Foreign Admits" <${options.smtpEmail}>`,
+      from: `"ForeignAdmits | VisaMonk.ai" <${options.smtpEmail}>`,
       to: options.to,
       subject: options.subject,
       text: textContent,
       html: trackedHtmlContent,
       headers: {
-        'X-Tracking-ID': options.trackingId, // Custom header for debugging
+        'X-Tracking-ID': options.trackingId,
       },
     }
 
@@ -396,14 +422,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       id: options.trackingId,
       batchId: options.batchId,
       contactName: options.contactName,
-      email: options.to, // This is still email for tracking purposes
+      email: options.to,
       sentAt: new Date().toISOString(),
       openCount: 0,
       clickCount: 0,
     })
 
     return true
-  } catch (error) {
+  } catch (error: any) {
     console.error("Email sending error:", error)
     return false
   }
@@ -429,7 +455,7 @@ async function recordEmailSent(record: TrackingRecord): Promise<void> {
 
     tracking.push(record)
     await fs.writeFile(TRACKING_FILE, JSON.stringify(tracking, null, 2))
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to record email tracking:", error)
   }
 }
@@ -440,7 +466,8 @@ export async function getBatchTracking(batchId: string): Promise<TrackingRecord[
     const data = await fs.readFile(TRACKING_FILE, "utf-8")
     const tracking: TrackingRecord[] = JSON.parse(data)
     return tracking.filter((record) => record.batchId === batchId)
-  } catch {
+  } catch (error: any) {
+    console.error("Failed to get batch tracking:", error)
     return []
   }
 }
@@ -450,7 +477,8 @@ export async function getAllTracking(): Promise<TrackingRecord[]> {
   try {
     const data = await fs.readFile(TRACKING_FILE, "utf-8")
     return JSON.parse(data)
-  } catch {
+  } catch (error: any) {
+    console.error("Failed to get all tracking:", error)
     return []
   }
 }

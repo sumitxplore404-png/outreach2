@@ -1,73 +1,39 @@
-# Batch History Deletion Feature Implementation
+# TODO: Fix Email Subject Line Issue
 
-## Completed Tasks
-- [x] Add DELETE method to `/api/batch/history` route
-- [x] Update backend to handle batch deletion from `batches.json`
-- [x] Update backend to handle tracking data cleanup from `tracking.json`
-- [x] Add checkbox selection to frontend component
-- [x] Add "Select All" functionality
-- [x] Add "Delete Selected" button with confirmation
-- [x] Implement API call to delete selected batches
-- [x] Add toast notifications for success/error feedback
-- [x] Refresh batch list after deletion
-- [x] Ensure stats update automatically (since they are calculated from batches.json)
+## Current Issue
+The email subject line is incorrectly including the full email content instead of just the subject. This happens during email generation where the parsing logic fails to properly separate the subject from the email body.
 
-## Email Open Tracking Feature
-- [x] Update email HTML template to include tracking pixel from public folder
-- [x] Create `/api/track/open` endpoint to serve tracking image and handle open events
-- [x] Implement bot detection and filtering for genuine opens
-- [x] Add tracking data logging with IP, user agent, and timestamp
-- [x] Update batch statistics automatically when emails are opened
-- [x] Handle edge cases (missing tracking ID, image not found, errors)
-- [x] Ensure proper cache headers to prevent image caching
+## Steps to Complete
 
-## Features Implemented
-- **Single Batch Deletion**: Users can select individual batches using checkboxes
-- **Multiple Batch Deletion**: Users can select multiple batches and delete them at once
-- **Select All**: Checkbox in header to select/deselect all batches
-- **Delete Confirmation**: Visual feedback showing number of selected batches
-- **Database Cleanup**: Both batch records and related tracking data are removed
-- **Stats Update**: Statistics automatically update after deletion since they are calculated from the data files
-- **Error Handling**: Proper error handling with user-friendly toast messages
-- **Loading States**: Loading indicators during deletion process
+### 1. Improve Subject Parsing Logic in lib/email.ts
+- [x] Review the current parsing patterns for extracting subject options from OpenAI response
+- [x] Enhance regex patterns to better match the expected format
+- [x] Add fallback logic to ensure subjects are properly extracted
+- [x] Add debug logging to track parsing success/failure
+- [x] Fix TypeScript errors for type annotations
 
-## Testing Checklist
-- [ ] Test single batch deletion
-- [ ] Test multiple batch deletion
-- [ ] Test "Select All" functionality
-- [ ] Verify tracking data is cleaned up
-- [ ] Verify stats update correctly after deletion
-- [ ] Test error scenarios (network issues, invalid data)
-- [ ] Test with empty selection (should be disabled)
+### 2. Test Email Generation
+- [x] Generate a test email to verify the subject line is correctly extracted
+- [x] Check that subject is short (max 8 words as per prompt) and doesn't contain email body
+- [x] Verify email preview displays correct subject
+- [x] Test sender details inclusion in email sign-off (name, designation, phone, company)
+- [x] Verify sign-off format: "Warm regards, [Name] [Designation] [Phone] [Company]"
 
-## User ID Integration in Tracking Events
+### 3. Validation
+- [x] Confirm subject appears correctly in email preview components
+- [x] Ensure no regression in email body content
+- [x] Test with different contact data to ensure robustness
 
-## Completed Tasks
-- [x] Add user_id field to tracking_events table inserts in click tracking API
-- [x] Add user_id field to tracking_events table inserts in open tracking API
-- [x] Add user_id field to error logging in tracking events
-- [x] Update batch statistics queries to filter by user_id
-- [x] Update contact update queries to filter by user_id
-- [x] Refactor open tracking API to use Supabase instead of local JSON files
-- [x] Ensure all tracking events include user_id for proper data isolation
+### 4. Fix Sender Details Integration
+- [x] Modify generateEmail function to use custom prompt directly when provided
+- [x] Increase max_tokens from 300 to 600 to prevent sign-off truncation
+- [x] Ensure sender details from frontend sidebar are properly included in email sign-off
 
-## Features Implemented
-- **User Data Isolation**: All tracking events now include user_id for multi-tenant support
-- **Supabase Integration**: Open tracking now uses Supabase database instead of local files
-- **Consistent Data Model**: Both click and open tracking use the same database schema
-- **Batch Stats Updates**: Batch statistics are updated with user_id filtering
-- **Error Logging**: Error events also include user_id for complete audit trail
+## Files to Edit
+- lib/email.ts (primary fix)
+- app/api/batch/generate/route.ts (verify usage)
 
-## Testing Checklist
-- [ ] Test click tracking with user_id inclusion
-- [ ] Test open tracking with user_id inclusion
-- [ ] Verify batch stats update correctly with user filtering
-- [ ] Test error logging includes user_id
-- [ ] Verify data isolation between different users
-
-## Notes
-- Stats are calculated dynamically from `batches.json` and `tracking.json`, so they automatically update when data is deleted
-- The deletion is permanent and cannot be undone
-- Authentication is required for all delete operations
-- Toast notifications provide user feedback for all operations
-- All tracking events now include user_id for proper multi-tenant data isolation
+## Expected Outcome
+- Subject line should be concise (max 8 words) and relevant
+- Email body should be properly separated and contain the full email content
+- Email preview should display correct subject without the body content

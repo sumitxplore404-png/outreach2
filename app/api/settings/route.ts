@@ -43,6 +43,10 @@ export async function GET() {
       email: settings?.email || "",
       appPassword: settings?.app_password ? "***" + settings.app_password.slice(-4) : "",
       ccRecipients: settings?.cc_recipients || "",
+      senderName: settings?.sender_name || "",
+      senderDesignation: settings?.sender_designation || "",
+      senderPhone: settings?.sender_phone || "",
+      senderCompany: settings?.sender_company || "",
       hasOpenaiKey: !!settings?.openai_api_key,
       hasAppPassword: !!settings?.app_password,
     }
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { openaiApiKey, email, appPassword, ccRecipients } = body
+    const { openaiApiKey, email, appPassword, ccRecipients, senderName, senderDesignation, senderPhone, senderCompany } = body
 
     // Validate required fields
     if (!openaiApiKey || !email || !appPassword) {
@@ -103,6 +107,10 @@ export async function POST(request: NextRequest) {
           email,
           app_password: appPassword,
           cc_recipients: ccRecipients || null,
+          sender_name: senderName || null,
+          sender_designation: senderDesignation || null,
+          sender_phone: senderPhone || null,
+          sender_company: senderCompany || null,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', userId)
@@ -116,6 +124,10 @@ export async function POST(request: NextRequest) {
           email,
           app_password: appPassword,
           cc_recipients: ccRecipients || null,
+          sender_name: senderName || null,
+          sender_designation: senderDesignation || null,
+          sender_phone: senderPhone || null,
+          sender_company: senderCompany || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
