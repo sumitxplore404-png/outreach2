@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { batchId, customPrompt, globalCC, senderName, senderDesignation, senderPhone, senderCompany } = await request.json()
+    const { batchId, customPrompt, globalCC, senderName, senderDesignation, senderPhone, senderCompany, startIndex, endIndex } = await request.json()
 
     if (!batchId) {
       return NextResponse.json({ error: "Batch ID is required" }, { status: 400 })
@@ -50,14 +50,36 @@ export async function POST(request: NextRequest) {
     const generatedEmails: GeneratedEmail[] = []
     const errors: string[] = []
 
-    // Generate emails for all contacts with valid email addresses
-    for (const contact of batch.contacts) {
-      // Skip contacts without email addresses or with empty required fields
-      if (!contact.mail || !contact.name || !contact.country || !contact["states/city"]) {
-        console.log(`Skipping contact due to missing required fields: country, states/city, or name. Found: country: '${contact.country}', states/city: '${contact["states/city"]}', name: '${contact.name}'`)
-        continue
+    // Validate and apply range filtering if provided
+    let contactsToProcess = batch.contacts
+    let rangeInfo = ""
+
+    if (startIndex !== undefined || endIndex !== undefined) {
+      const start = startIndex || 0
+      const end = endIndex || batch.contacts.length
+
+      // Validate range
+      if (start < 0 || end < start || end > batch.contacts.length) {
+        return NextResponse.json({
+          error: "Invalid range",
+          details: `startIndex must be >= 0, endIndex must be > startIndex and <= ${batch.contacts.length}`
+        }, { status: 400 })
       }
 
+      contactsToProcess = batch.contacts.slice(start, end)
+      rangeInfo = ` (processing contacts ${start + 1}-${end} of ${batch.contacts.length})`
+    }
+
+    // Filter valid contacts from the selected range
+    const validContacts = contactsToProcess.filter(contact =>
+      contact.mail && contact.name && contact.country && contact["states/city"]
+    )
+
+    console.log(`Processing ${validContacts.length} valid contacts out of ${contactsToProcess.length} selected contacts${rangeInfo}`)
+
+    // Process all valid contacts concurrently for maximum efficiency
+    // This is truly parallel processing - all emails start generation simultaneously
+    const emailPromises = validContacts.map(async (contact) => {
       try {
         // Map Contact to ContactData for email generation
         const contactData = {
@@ -80,7 +102,6 @@ export async function POST(request: NextRequest) {
           prospect_persona: contact.designation || "International Student Services"
         }
 
-
         let effectiveCustomPrompt = ""
 
         if (customPrompt && customPrompt.trim()) {
@@ -88,15 +109,15 @@ export async function POST(request: NextRequest) {
           effectiveCustomPrompt = `${customPrompt.trim()}
 
 RECIPIENT DETAILS (use these in the email):
-- Recipient Name: ${contact.name}
-- University/Institution: ${contact.university || "their institution"}
-- Designation: ${contact.designation || "their role"}
+-- Recipient Name: ${contact.name}
+-- University/Institution: ${contact.university || "their institution"}
+-- Designation: ${contact.designation || "their role"}
 
 SENDER DETAILS (use these for email signature):
-- Sender Name: ${finalSenderName}
-- Designation: ${finalSenderDesignation}
-- Phone: ${finalSenderPhone}
-- Company: ${finalSenderCompany}
+-- Sender Name: ${finalSenderName}
+-- Designation: ${finalSenderDesignation}
+-- Phone: ${finalSenderPhone}
+-- Company: ${finalSenderCompany}
 
 IMPORTANT REQUIREMENTS:
 1. Address the email to "${contact.name}" specifically (not [Recipient's Name] or placeholder)
@@ -108,7 +129,7 @@ IMPORTANT REQUIREMENTS:
 EXACT OUTPUT FORMAT REQUIRED:
 **SUBJECT LINE:**
 Option 1: [specific subject line - max 8 words]
-Option 2: [specific subject line - max 8 words]  
+Option 2: [specific subject line - max 8 words]
 Option 3: [specific subject line - max 8 words]
 
 **EMAIL BODY:**
@@ -119,28 +140,28 @@ Option 3: [specific subject line - max 8 words]
           effectiveCustomPrompt = `Write a professional cold email pitching VisaMonk.ai (ForeignAdmits product) to ${contact.name} at ${contact.university || "their institution"}.
 
 RECIPIENT DETAILS:
-- Name: ${contact.name}
-- Institution: ${contact.university || "their institution"}
-- Role: ${contact.designation || "International Student Services"}
+-- Name: ${contact.name}
+-- Institution: ${contact.university || "their institution"}
+-- Role: ${contact.designation || "International Student Services"}
 
 SENDER DETAILS:
-- Name: ${finalSenderName}
-- Designation: ${finalSenderDesignation}
-- Phone: ${finalSenderPhone}  
-- Company: ${finalSenderCompany}
+-- Name: ${finalSenderName}
+-- Designation: ${finalSenderDesignation}
+-- Phone: ${finalSenderPhone}
+-- Company: ${finalSenderCompany}
 
 PRODUCT DETAILS:
-- Product: VisaMonk.ai (AI copilot for visa interview preparation)
-- Benefits: Saves 30-45 min per student assessment, improves readiness rates by 20-30%
-- Target: Study-abroad counselors and international education teams
+-- Product: VisaMonk.ai (AI copilot for visa interview preparation)
+-- Benefits: Saves 30-45 min per student assessment, improves readiness rates by 20-30%
+-- Target: Study-abroad counselors and international education teams
 
 REQUIREMENTS:
-- Address email specifically to "${contact.name}" (not placeholder)
-- Mention "${contact.university || 'their institution'}" by name
-- Professional yet personalized tone
-- Include key product benefits and metrics
-- Clear call-to-action for demo/meeting
-- Complete signature with all sender details
+-- Address email specifically to "${contact.name}" (not placeholder)
+-- Mention "${contact.university || 'their institution'}" by name
+-- Professional yet personalized tone
+-- Include key product benefits and metrics
+-- Clear call-to-action for demo/meeting
+-- Complete signature with all sender details
 
 EXACT OUTPUT FORMAT:
 **SUBJECT LINE:**
@@ -166,8 +187,7 @@ ${finalSenderCompany}`
         const emailContent = await generateEmail(contactData, settings.openaiApiKey, effectiveCustomPrompt)
 
         if (!emailContent) {
-          errors.push(`Failed to generate email for ${contact.name}`)
-          continue
+          throw new Error(`Failed to generate email content for ${contact.name}`)
         }
 
         // Create tracking ID
@@ -201,20 +221,43 @@ ${finalSenderCompany}`
           contactName: contact.name,
           university: contact.university || "Institution",
           email: contact.mail,
-          subject: emailContent.subjectOptions.length > 0 
-            ? emailContent.subjectOptions[0] 
+          subject: emailContent.subjectOptions.length > 0
+            ? emailContent.subjectOptions[0]
             : `Partnership opportunity with ${contact.university || 'your institution'}`,
           htmlContent: finalHtmlContent,
           textContent: finalHtmlContent.replace(/<br>/g, '\n').replace(/<[^>]*>/g, ""), // Convert back to text
           trackingId
         }
 
-        generatedEmails.push(generatedEmail)
+        return generatedEmail
+
       } catch (error) {
         console.error(`Error generating email for ${contact.name}:`, error)
-        errors.push(`Error generating email for ${contact.name}: ${(error as Error).message}`)
+        return {
+          error: true,
+          contactName: contact.name,
+          message: (error as Error).message
+        }
       }
-    }
+    })
+
+    // Wait for all emails to complete concurrently
+    const results = await Promise.allSettled(emailPromises)
+
+    // Process results
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        const emailResult = result.value as GeneratedEmail | { error: boolean; contactName: string; message: string }
+        if ('error' in emailResult && emailResult.error) {
+          errors.push(`Failed to generate email for ${emailResult.contactName}: ${emailResult.message}`)
+        } else {
+          generatedEmails.push(emailResult as GeneratedEmail)
+        }
+      } else {
+        console.error('Email generation error:', result.reason)
+        errors.push(`Email generation error: ${result.reason}`)
+      }
+    })
 
     return NextResponse.json({
       success: true,
@@ -222,7 +265,7 @@ ${finalSenderCompany}`
       total: batch.contacts.filter(c => c.mail).length, // Only count contacts with emails
       generated: generatedEmails.length,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully generated ${generatedEmails.length} emails from ${batch.contacts.filter(c => c.mail).length} valid contacts`,
+      message: `Successfully generated ${generatedEmails.length} emails from ${contactsToProcess.filter(c => c.mail).length} valid contacts${rangeInfo}`,
     })
   } catch (error) {
     console.error("Email generation error:", error)

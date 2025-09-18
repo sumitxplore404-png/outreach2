@@ -252,7 +252,7 @@ export function UploadBatchSection({ onCsvProcessed, uploadedDocs }: UploadBatch
       formData.append("batchId", batchInfo.id)
       formData.append("generatedEmails", JSON.stringify(generatedEmails))
 
-      // Add attachment if available
+      // Add attachments if available
       if (uploadedDocs && uploadedDocs.length > 0) {
         // Append all uploaded documents as attachments
         uploadedDocs.forEach((doc, index) => {
