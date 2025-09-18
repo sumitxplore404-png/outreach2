@@ -56,6 +56,16 @@ interface EmailOptions {
   contactName: string
   trackingBaseUrl: string
   cc?: string[]
+  attachment?: {
+    filename: string
+    content: Buffer
+    contentType?: string
+  }
+  attachments?: {
+    filename: string
+    content: Buffer
+    contentType?: string
+  }[]
 }
 
 interface ContactData {
@@ -311,8 +321,7 @@ function addTrackingToEmail(htmlContent: string, trackingId: string, trackingBas
         
         <div class="footer">
             <p style="font-size: 10px; color: #999;">
-                If you no longer wish to receive these emails, you can 
-                <a href="${trackingBaseUrl}/unsubscribe?id=${trackingId}" style="color: #999;">unsubscribe here</a>.
+                <!-- Unsubscribe link removed as per user request -->
             </p>
         </div>
     </div>
@@ -411,6 +420,22 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     // Add CC recipients if provided
     if (options.cc && options.cc.length > 0) {
       mailOptions.cc = options.cc
+    }
+
+    // Add attachment if provided
+    if (options.attachment) {
+      mailOptions.attachments = [
+        {
+          filename: options.attachment.filename,
+          content: options.attachment.content,
+          contentType: options.attachment.contentType,
+        }
+      ]
+    }
+
+    // Add multiple attachments if provided
+    if (options.attachments && options.attachments.length > 0) {
+      mailOptions.attachments = mailOptions.attachments ? mailOptions.attachments.concat(options.attachments) : options.attachments
     }
 
     const info = await transporter.sendMail(mailOptions)

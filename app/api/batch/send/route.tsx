@@ -12,10 +12,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { batchId, generatedEmails } = await request.json()
+    const formData = await request.formData()
+    const batchId = formData.get("batchId") as string
+    const generatedEmailsString = formData.get("generatedEmails") as string
+    const attachment = formData.get("attachment") as File | null
 
     if (!batchId) {
       return NextResponse.json({ error: "Batch ID is required" }, { status: 400 })
+    }
+
+    let generatedEmails
+    try {
+      generatedEmails = JSON.parse(generatedEmailsString)
+    } catch (error) {
+      return NextResponse.json({ error: "Invalid generatedEmails format" }, { status: 400 })
     }
 
     // Get user identifier (using email as user_id for simplicity)
@@ -36,6 +46,20 @@ export async function POST(request: NextRequest) {
     let delivered = 0
     const errors: string[] = []
 
+    // Prepare attachments array from formData
+    const attachments: { filename: string; content: Buffer; contentType?: string }[] = []
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith("attachment")) {
+        const file = value as File
+        const buffer = Buffer.from(await file.arrayBuffer())
+        attachments.push({
+          filename: file.name,
+          content: buffer,
+          contentType: file.type || undefined,
+        })
+      }
+    }
+
     // Process each generated email
     for (let i = 0; i < generatedEmails.length; i++) {
       const emailData = generatedEmails[i]
@@ -45,7 +69,7 @@ export async function POST(request: NextRequest) {
         const emailToUse = settings.email
         const passwordToUse = settings.appPassword
 
-        // Send email
+        // Send email with all attachments
         const success = await sendEmail({
           to: emailData.email,
           subject: emailData.subject,
@@ -58,6 +82,7 @@ export async function POST(request: NextRequest) {
           contactName: emailData.contactName,
           trackingBaseUrl: process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
           cc: emailData.cc, // Pass CC recipients from frontend if any
+          attachments, // Pass all attachments
         })
 
         if (success) {

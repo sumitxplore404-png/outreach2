@@ -52,7 +52,12 @@ interface GenerateResponse {
   message: string
 }
 
-export function UploadBatchSection() {
+interface UploadBatchSectionProps {
+  onCsvProcessed?: () => void
+  uploadedDocs?: File[]
+}
+
+export function UploadBatchSection({ onCsvProcessed, uploadedDocs }: UploadBatchSectionProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -134,6 +139,10 @@ export function UploadBatchSection() {
           id: data.batchId,
           totalContacts: data.totalContacts,
         })
+        // Notify parent component that CSV has been processed
+        if (onCsvProcessed) {
+          onCsvProcessed()
+        }
       } else {
         setStatus("error")
         setMessage(data.error || "Failed to process batch")
@@ -239,15 +248,21 @@ export function UploadBatchSection() {
     const progressInterval = simulateProgress(95)
 
     try {
+      const formData = new FormData()
+      formData.append("batchId", batchInfo.id)
+      formData.append("generatedEmails", JSON.stringify(generatedEmails))
+
+      // Add attachment if available
+      if (uploadedDocs && uploadedDocs.length > 0) {
+        // Append all uploaded documents as attachments
+        uploadedDocs.forEach((doc, index) => {
+          formData.append(`attachment${index}`, doc)
+        })
+      }
+
       const response = await fetch("/api/batch/send", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          batchId: batchInfo.id,
-          generatedEmails // Send the generated emails with any edits
-        }),
+        body: formData,
       })
 
       const data: SendResponse = await response.json()
@@ -579,7 +594,7 @@ export function UploadBatchSection() {
             <div className="space-y-1">
               <p className="font-medium">Important notes:</p>
               <ul className="list-disc list-inside space-y-1 ml-4 text-xs">
-                <li>Maximum 100 rows per batch for optimal performance</li>
+                <li>Maximum 1000 rows per batch for optimal performance</li>
                 <li>Country, States/City, Name are required</li>
                 <li>Designation, Mail, University are optional - can be left blank</li>
                 <li>Email addresses must be valid format (when provided)</li>

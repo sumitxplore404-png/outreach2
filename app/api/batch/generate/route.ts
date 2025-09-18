@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
 
     // Generate emails for all contacts with valid email addresses
     for (const contact of batch.contacts) {
-      // Skip contacts without email addresses
-      if (!contact.mail) {
-        console.log(`Skipping contact ${contact.name} - no email address provided`)
+      // Skip contacts without email addresses or with empty required fields
+      if (!contact.mail || !contact.name || !contact.country || !contact["states/city"]) {
+        console.log(`Skipping contact due to missing required fields: country, states/city, or name. Found: country: '${contact.country}', states/city: '${contact["states/city"]}', name: '${contact.name}'`)
         continue
       }
 
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
           lead_source: "Cold outbound via LinkedIn",
           prospect_persona: contact.designation || "International Student Services"
         }
+
 
         let effectiveCustomPrompt = ""
 

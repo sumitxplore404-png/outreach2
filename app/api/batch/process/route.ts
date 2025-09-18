@@ -13,8 +13,8 @@ interface CSVRow {
   university: string
 }
 
-// Parse CSV content with proper handling of quoted fields
-function parseCSV(content: string): CSVRow[] {
+// Parse CSV content with proper handling of quoted fields and blank rows
+function parseCSV(content: string): { contacts: CSVRow[], skippedRows: number } {
   const lines = content.trim().split("\n")
   if (lines.length < 2) {
     throw new Error("CSV must contain at least a header row and one data row")
@@ -39,12 +39,27 @@ function parseCSV(content: string): CSVRow[] {
   console.log('Header mapping:', headerMap)
 
   const rows: CSVRow[] = []
+  let skippedRows = 0
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim()
-    if (!line) continue // Skip empty lines
+
+    // Skip completely empty lines
+    if (!line) {
+      console.log(`Skipping empty line ${i + 1}`)
+      skippedRows++
+      continue
+    }
 
     // Parse CSV line with proper quote handling
     const values = parseCSVLine(line)
+
+    // Skip lines with no values or all empty values
+    if (values.length === 0 || values.every(v => !v.trim())) {
+      console.log(`Skipping blank line ${i + 1}`)
+      skippedRows++
+      continue
+    }
 
     // Ensure we have at least the required number of columns
     // If fewer columns than headers, pad with empty strings
@@ -62,33 +77,43 @@ function parseCSV(content: string): CSVRow[] {
     Object.keys(headerMap).forEach(requiredHeader => {
       const originalHeader = headerMap[requiredHeader]
       const index = headers.indexOf(originalHeader)
-      row[requiredHeader] = values[index] || ""
+      row[requiredHeader] = (values[index] || "").trim()
     })
 
     // Debug: Log the parsed row
     console.log(`Row ${i + 1} parsed:`, row)
 
-    // Validate required fields (designation, mail, university are optional)
+    // Skip rows with empty required fields (country, states/city, name are required)
     if (!row.country || !row["states/city"] || !row.name) {
-      throw new Error(`Row ${i + 1} has empty required fields. Required: country, states/city, name. Optional: designation, mail, university. Found: ${Object.keys(row).map(k => `${k}: '${row[k]}'`).join(', ')}`)
+      console.log(`Skipping row ${i + 1} due to empty required fields. Required: country, states/city, name. Optional: designation, mail, university. Found: ${Object.keys(row).map(k => `${k}: '${row[k]}'`).join(', ')}`)
+      skippedRows++
+      continue
     }
 
-    // Validate email format (only if mail is provided)
-    if (row.mail) {
+    // Validate email format (only if mail is provided and not empty)
+    if (row.mail && row.mail.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(row.mail)) {
-        throw new Error(`Row ${i + 1} has invalid email format: ${row.mail}`)
+      if (!emailRegex.test(row.mail.trim())) {
+        console.log(`Skipping row ${i + 1} due to invalid email format: ${row.mail}`)
+        skippedRows++
+        continue
       }
     }
 
     rows.push(row as CSVRow)
   }
 
-  if (rows.length > 100) {
-    throw new Error("Maximum 100 rows allowed per batch")
+  console.log(`CSV processing complete: ${rows.length} valid rows, ${skippedRows} skipped rows`)
+
+  if (rows.length === 0) {
+    throw new Error("No valid rows found in CSV. Please ensure your CSV has the required columns (country, states/city, name) and at least one row with valid data.")
   }
 
-  return rows
+  if (rows.length > 1000) {
+    throw new Error("Maximum 1000 rows allowed per batch")
+  }
+
+  return { contacts: rows, skippedRows }
 }
 
 // Parse a single CSV line handling quoted fields properly
@@ -190,9 +215,12 @@ export async function POST(request: NextRequest) {
     // Read and parse CSV
     const content = await file.text()
     let contacts: CSVRow[]
+    let skippedRows = 0
 
     try {
-      contacts = parseCSV(content)
+      const parseResult = parseCSV(content)
+      contacts = parseResult.contacts
+      skippedRows = parseResult.skippedRows
     } catch (error) {
       return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
@@ -219,7 +247,8 @@ export async function POST(request: NextRequest) {
       success: true,
       batchId,
       totalContacts: contacts.length,
-      message: `Successfully processed ${contacts.length} contacts`,
+      skippedRows: skippedRows,
+      message: `Successfully processed ${contacts.length} contacts${skippedRows > 0 ? ` (${skippedRows} rows skipped due to missing/invalid data)` : ''}`,
     })
   } catch (error) {
     console.error("Batch processing error:", error)

@@ -5,9 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Upload, History, BarChart3, Sparkles } from "lucide-react"
+import { DashboardSidebar } from "@/components/dashboard-sidebar"
+import { DashboardHeader } from "@/components/dashboard-header"
 
 // Dynamic imports for better performance - components load only when needed
-const UploadBatchSection = dynamic(() => import("@/components/upload-batch-section").then(mod => ({ default: mod.UploadBatchSection })), {
+const UploadBatchSection = dynamic(() => import("@/components/upload-batch-section").then(mod => mod.UploadBatchSection), {
   loading: () => <LoadingSectionSkeleton />,
   ssr: false
 })
@@ -122,6 +124,8 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showWelcome, setShowWelcome] = useState(false)
   const [preloadedTabs, setPreloadedTabs] = useState<Set<string>>(new Set(["upload"]))
+  const [uploadedDocs, setUploadedDocs] = useState<File[]>([])
+  const [isCsvLoaded, setIsCsvLoaded] = useState(false)
 
   useEffect(() => {
     // Simulate loading delay for demo purposes - made faster for better UX
@@ -164,65 +168,83 @@ export default function DashboardPage() {
    }
 
    return (
-     <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
-       {/* Welcome Message */}
-       {showWelcome && (
-         <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 animate-in slide-in-from-top-2 duration-300">
-           <div className="flex items-center space-x-3">
-             <Sparkles className="h-5 w-5 text-green-500 animate-pulse" />
+     <div className="flex h-screen bg-background">
+       {/* Sidebar */}
+       <DashboardSidebar
+         uploadedDocs={uploadedDocs}
+         setUploadedDocs={setUploadedDocs}
+         isCsvLoaded={isCsvLoaded}
+       />
+
+       {/* Main content area */}
+       <div className="flex-1 flex flex-col overflow-hidden">
+         <DashboardHeader />
+         <main className="flex-1 overflow-y-auto p-6">
+           <div className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+             {/* Welcome Message */}
+             {showWelcome && (
+               <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 animate-in slide-in-from-top-2 duration-300">
+                 <div className="flex items-center space-x-3">
+                   <Sparkles className="h-5 w-5 text-green-500 animate-pulse" />
+                   <div>
+                     <p className="text-sm font-medium text-green-900">Welcome back! 🎉</p>
+                     <p className="text-xs text-green-700">Your email outreach dashboard is ready to go!</p>
+                   </div>
+                 </div>
+               </div>
+             )}
+
              <div>
-               <p className="text-sm font-medium text-green-900">Welcome back! 🎉</p>
-               <p className="text-xs text-green-700">Your email outreach dashboard is ready to go!</p>
+               <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+               <p className="text-muted-foreground">Manage your email outreach campaigns</p>
              </div>
-           </div>
-         </div>
-       )}
 
-       <div>
-         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-         <p className="text-muted-foreground">Manage your email outreach campaigns</p>
-       </div>
-
-       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-         <TabsList className="grid w-full grid-cols-3">
-           <TabsTrigger
-             value="upload"
-             className="flex items-center gap-2"
-             onMouseEnter={() => handleTabHover("upload")}
-           >
-             <Upload className="h-4 w-4" />
-             Upload Batch
-           </TabsTrigger>
-           <TabsTrigger
-             value="history"
-             className="flex items-center gap-2"
-             onMouseEnter={() => handleTabHover("history")}
-           >
-             <History className="h-4 w-4" />
-             Batch History
-           </TabsTrigger>
-           <TabsTrigger
-             value="stats"
-             className="flex items-center gap-2"
-             onMouseEnter={() => handleTabHover("stats")}
-           >
-             <BarChart3 className="h-4 w-4" />
-             Monthly Stats
-           </TabsTrigger>
-         </TabsList>
+             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+               <TabsList className="grid w-full grid-cols-3">
+                 <TabsTrigger
+                   value="upload"
+                   className="flex items-center gap-2"
+                   onMouseEnter={() => handleTabHover("upload")}
+                 >
+                   <Upload className="h-4 w-4" />
+                   Upload Batch
+                 </TabsTrigger>
+                 <TabsTrigger
+                   value="history"
+                   className="flex items-center gap-2"
+                   onMouseEnter={() => handleTabHover("history")}
+                 >
+                   <History className="h-4 w-4" />
+                   Batch History
+                 </TabsTrigger>
+                 <TabsTrigger
+                   value="stats"
+                   className="flex items-center gap-2"
+                   onMouseEnter={() => handleTabHover("stats")}
+                 >
+                   <BarChart3 className="h-4 w-4" />
+                   Monthly Stats
+                 </TabsTrigger>
+               </TabsList>
 
          <TabsContent value="upload" className="space-y-6">
-           <UploadBatchSection />
+           <UploadBatchSection
+             onCsvProcessed={() => setIsCsvLoaded(true)}
+             uploadedDocs={uploadedDocs}
+           />
          </TabsContent>
 
-         <TabsContent value="history" className="space-y-6">
-           <BatchHistorySection />
-         </TabsContent>
+               <TabsContent value="history" className="space-y-6">
+                 <BatchHistorySection />
+               </TabsContent>
 
-         <TabsContent value="stats" className="space-y-6">
-           <MonthlyStatsSection />
-         </TabsContent>
-       </Tabs>
+               <TabsContent value="stats" className="space-y-6">
+                 <MonthlyStatsSection />
+               </TabsContent>
+             </Tabs>
+           </div>
+         </main>
+       </div>
      </div>
    )
  }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Settings, Key, Mail, Lock, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { Settings, Key, Mail, Lock, CheckCircle, AlertCircle, Loader2, Upload, FileText, X } from "lucide-react"
 
 interface SettingsState {
   openaiApiKey: string
@@ -32,7 +32,13 @@ interface SettingsResponse {
   hasAppPassword: boolean
 }
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  uploadedDocs: File[]
+  setUploadedDocs: (docs: File[]) => void
+  isCsvLoaded: boolean
+}
+
+export function DashboardSidebar({ uploadedDocs, setUploadedDocs, isCsvLoaded }: DashboardSidebarProps) {
   const [settings, setSettings] = useState<SettingsState>({
     openaiApiKey: "",
     email: "",
@@ -172,10 +178,80 @@ export function DashboardSidebar() {
               </div>
             </CardContent>
           </Card>
-        </div>
-      </aside>
-    )
-  }
+
+        {/* Document Upload Section - Only show when CSV is loaded */}
+        {isCsvLoaded && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Attach Documents
+              </CardTitle>
+              <CardDescription>Upload documents to attach to all emails in this batch</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="doc-upload" className="text-sm font-medium">
+                  Document Files
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="doc-upload"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || [])
+                      if (files.length > 0) {
+                        setUploadedDocs([...uploadedDocs, ...files])
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Supported formats: PDF, DOC, DOCX, TXT, JPG, PNG (max 10MB each)
+                </p>
+              </div>
+
+              {uploadedDocs.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Uploaded Documents ({uploadedDocs.length})</Label>
+                  {uploadedDocs.map((doc, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-md">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{doc.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(doc.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setUploadedDocs(uploadedDocs.filter((_, i) => i !== index))
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    These documents will be attached to all emails when sending the batch.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </aside>
+  )
+}
 
   return (
     <aside className="w-80 bg-sidebar border-r border-sidebar-border p-6 overflow-y-auto">
@@ -362,6 +438,76 @@ export function DashboardSidebar() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Document Upload Section - Only show when CSV is loaded */}
+        {isCsvLoaded && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Attach Documents
+              </CardTitle>
+              <CardDescription>Upload documents to attach to all emails in this batch</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="doc-upload" className="text-sm font-medium">
+                  Document Files
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="doc-upload"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || [])
+                      if (files.length > 0) {
+                        setUploadedDocs([...uploadedDocs, ...files])
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Supported formats: PDF, DOC, DOCX, TXT, JPG, PNG (max 10MB each)
+                </p>
+              </div>
+
+              {uploadedDocs.length > 0 && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Uploaded Documents ({uploadedDocs.length})</Label>
+                  {uploadedDocs.map((doc, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-md">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{doc.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(doc.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setUploadedDocs(uploadedDocs.filter((_, i) => i !== index))
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    These documents will be attached to all emails when sending the batch.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </aside>
   )
